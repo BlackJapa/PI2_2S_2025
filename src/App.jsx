@@ -2,18 +2,43 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from "react-route
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './App.css';
 
-export default function App() {
+function App() {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<DashboardWrapper />} />
-      </Routes>
+      <div className="container-fluid">
+        {/* Navbar fixa no topo */}
+        <nav className="navbar navbar-custom navbar-expand-lg">
+          <div className="container">
+            <span className="navbar-brand mb-0 h1 mx-auto">
+              Condomínio Transparente
+            </span>
+          </div>
+        </nav>
+
+        {/* Conteúdo principal centralizado */}
+        <main className="main-content">
+          <div className="card">
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/dashboard" element={<DashboardWrapper />} />
+            </Routes>
+          </div>
+        </main>
+
+        {/* Footer fixo na base */}
+        <footer className="footer-custom">
+          {/* Footer vazio conforme solicitado */}
+        </footer>
+      </div>
     </Router>
   );
 }
+
+export default App;
 
 // Wrapper para pegar os dados do estado da navegação
 function DashboardWrapper() {
