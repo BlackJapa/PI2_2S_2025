@@ -24,10 +24,9 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  padding: 0;
   min-height: 100vh;
+  min-width: 320px;
 }
 
 h1 {
@@ -54,6 +53,12 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* Ajustes para o layout principal */
+.container-fluid {
+  padding: 0;
+}
+
+/* Ajustes para modo claro */
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
@@ -64,5 +69,22 @@ button:focus-visible {
   }
   button {
     background-color: #f9f9f9;
+    color: #213547;
+  }
+  
+  .navbar-custom {
+    background-color: #8B0000; /* Mantém vermelho ferrugíneo no modo claro */
+    border-bottom: 1px solid #660000;
+    color: white;
+  }
+  
+  .footer-custom {
+    background-color: #8B0000; /* Mantém vermelho ferrugíneo no modo claro */
+    border-top: 1px solid #660000;
+  }
+  
+  .card {
+    background-color: #8B4513; /* Mantém cor parda no modo claro */
+    color: white;
   }
 }
