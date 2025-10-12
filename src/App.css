@@ -1,8 +1,18 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   padding: 2rem;
-  text-align: center;
+  margin-top: 56px; /* Altura da navbar */
+  margin-bottom: 56px; /* Altura do footer */
 }
 
 .logo {
@@ -35,8 +45,52 @@
 
 .card {
   padding: 2em;
+  width: 100%;
+  max-width: 600px;
+  background-color: #8B4513; /* Cor parda */
+  border: 2px solid #654321;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .read-the-docs {
   color: #888;
+}
+
+/* Navbar e Footer customizados - Vermelho ferrugíneo */
+.navbar-custom {
+  background-color: #8B0000; /* Vermelho ferrugíneo */
+  border-bottom: 1px solid #660000;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  color: white;
+}
+
+.navbar-brand {
+  color: white !important;
+  font-weight: bold;
+}
+
+.footer-custom {
+  background-color: #8B0000; /* Vermelho ferrugíneo */
+  border-top: 1px solid #660000;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height: 56px;
+}
+
+/* Responsividade adicional */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+    margin-top: 56px;
+    margin-bottom: 56px;
+  }
+  
+  .card {
+    padding: 1em;
+  }
 }
