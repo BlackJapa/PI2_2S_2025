@@ -13,6 +13,21 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+h2 {
+  color: #fff;
+  padding-bottom: 1rem;
+}
+
+th {
+  color: #ffa;
+  }
+
+td {
+  color: #dcdcdc;
+  border-bottom: 1px dashed gray;
+}  
+
+
 a {
   font-weight: 500;
   color: #646cff;
