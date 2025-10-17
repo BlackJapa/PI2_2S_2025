@@ -1,11 +1,14 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
+import { useState } from "react";
+import Login from "./src/pages/Login";
+import Register from "./src/pages/Register";
+import Dashboard from "./src/pages/Dashboard";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
 function App() {
+  const [highContrast, setHighContrast] = useState(false);
+
   return (
     <Router>
       <div className="container-fluid">
@@ -15,6 +18,12 @@ function App() {
             <span className="navbar-brand mb-0 h1 mx-auto">
               Condomínio Transparente
             </span>
+            <button 
+              className="btn btn-outline-light btn-sm"
+              onClick={() => setHighContrast(!highContrast)}
+            >
+              {highContrast ? '☀️ Normal' : '🌙 Alto Contraste'}
+            </button>
           </div>
         </nav>
 
