@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://condominio-transparente.onrender.com';
+
 export default function Register() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -39,7 +41,7 @@ export default function Register() {
     // --- Fim das Validações ---
 
     try {
-      const response = await fetch('/api/register', {
+      const response = await fetch(`${API_URL}/api/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

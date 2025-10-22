@@ -4,6 +4,8 @@ import { useLocation } from "react-router-dom";
 // Adicionei um estilo para o cursor "pointer" para os status clicáveis
 const cursorPointerStyle = { cursor: 'pointer' };
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://condominio-transparente.onrender.com';
+
 export default function Dashboard() {
   const location = useLocation();
   const user = location.state || { email: "Visitante", id: null, role: 'morador', is_admin: false };
@@ -27,7 +29,7 @@ export default function Dashboard() {
   const fetchComplaints = async () => {
     if (!user || !user.id) return;
     try {
-      const response = await fetch(`/api/complaints?user_id=${user.id}`);
+      const response = await fetch(`${API_URL}/api/complaints?user_id=${user.id}`);
       if (!response.ok) throw new Error('Falha ao buscar reclamações.');
       const data = await response.json();
       setComplaints(data);
@@ -37,7 +39,7 @@ export default function Dashboard() {
   const fetchUsers = async () => {
     if (!user || !user.id) return;
     try {
-      const response = await fetch(`/api/users?user_id=${user.id}`);
+      const response = await fetch(`${API_URL}/api/users?user_id=${user.id}`);
       if (!response.ok) throw new Error('Falha na autorização ou busca.');
       const data = await response.json();
       setUsers(data);
@@ -54,7 +56,7 @@ export default function Dashboard() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await fetch('/api/complaints', {
+      const response = await fetch(`${API_URL}/api/complaints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.id, subject, description }),
@@ -92,7 +94,7 @@ export default function Dashboard() {
     if (!selectedComplaint) return;
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/complaints/${selectedComplaint.id}?user_id=${user.id}`, {
+      const response = await fetch(`${API_URL}/api/complaints/${selectedComplaint.id}?user_id=${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, admin_comment: newAdminComment }),

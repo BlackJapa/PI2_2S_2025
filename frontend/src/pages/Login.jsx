@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://condominio-transparente.onrender.com';
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +23,7 @@ export default function Login() {
     }
 
     try {
-      const response = await fetch('/api/login', {
+      const response = await await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +40,9 @@ export default function Login() {
             email: data.email, 
             bloco: data.bloco, 
             apartment: data.apartment,
-            is_admin: data.is_admin
+            is_admin: data.is_admin,
+            role: data.role, // Passando o role
+            bloco_id: data.bloco_id // Passando o ID do bloco
           },
         });
       } else {

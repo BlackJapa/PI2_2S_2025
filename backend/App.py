@@ -4,19 +4,19 @@ Backend principal da aplicação Flask para o sistema de gestão de condomínio.
 Este módulo contém as rotas da API para registro, login e gerenciamento de usuários.
 """
 # Imports reordenados: bibliotecas padrão primeiro, depois de terceiros.
-import sqlite3
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import Flask, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-DATABASE = 'condominio.db'
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
-    """Cria e retorna uma conexão com o banco de dados."""
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    """Cria e retorna uma conexão com o banco de dados PostgreSQL."""
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     return conn
-
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -39,7 +39,7 @@ def register():
         cursor.execute('''
             SELECT a.apartamento_id FROM Apartamentos a
             JOIN Blocos b ON a.bloco_id = b.bloco_id
-            WHERE b.numero_bloco = ? AND a.numero_apartamento = ?
+            WHERE b.numero_bloco = %s AND a.numero_apartamento = %s
         ''', (bloco, apartamento))
         ap_id_result = cursor.fetchone()
 
@@ -50,7 +50,7 @@ def register():
 
         cursor.execute('''
             INSERT INTO Moradores (nome, email, password, apartamento_id, role)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         ''', (nome, email, hashed_password, apartamento_id, 'morador'))
 
         conn.commit()
@@ -72,7 +72,7 @@ def login():
     cursor = conn.cursor()
 
     try:
-        cursor.execute('SELECT * FROM Moradores WHERE email = ?', (email,))
+        cursor.execute('SELECT * FROM Moradores WHERE email = %s', (email,))
         morador = cursor.fetchone()
 
         if morador and check_password_hash(morador['password'], password):
@@ -80,7 +80,7 @@ def login():
                 SELECT b.numero_bloco, b.bloco_id, a.numero_apartamento
                 FROM Apartamentos a
                 JOIN Blocos b ON a.bloco_id = b.bloco_id
-                WHERE a.apartamento_id = ?
+                WHERE a.apartamento_id = %s
             ''', (morador['apartamento_id'],))
             ap_info = cursor.fetchone()
 
@@ -108,7 +108,7 @@ def get_users():
     user_id = request.args.get('user_id', type=int)
     conn = get_db_connection()
     current_user = conn.execute(
-        'SELECT * FROM Moradores WHERE morador_id = ?', (user_id,)
+        'SELECT * FROM Moradores WHERE morador_id = %s', (user_id,)
     ).fetchone()
 
     if not current_user:
@@ -119,7 +119,7 @@ def get_users():
         return jsonify({'error': 'Acesso negado'}), 403
 
     user_bloco_id = conn.execute("""
-        SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = ?
+        SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = %s
     """, (current_user['apartamento_id'],)).fetchone()['bloco_id']
 
     # Quebra da linha longa para melhor legibilidade
@@ -133,7 +133,7 @@ def get_users():
 
     params = []
     if current_user['role'] == 'admin_bloco':
-        query += " WHERE b.bloco_id = ?"
+        query += " WHERE b.bloco_id = %s"
         params.append(user_bloco_id)
 
     users = conn.execute(query, params).fetchall()
@@ -158,7 +158,7 @@ def create_complaint():
         cursor.execute(
             """
             INSERT INTO Complaints (user_id, subject, description, date, status)
-            VALUES (?, ?, ?, datetime('now', 'localtime'), 'aberto')
+            VALUES (%s, %s, %s, datetime('now', 'localtime'), 'aberto')
             """,
             (user_id, subject, description)
         )
@@ -179,14 +179,14 @@ def get_complaints():
         return jsonify({'error': 'ID de usuário é obrigatório'}), 400
 
     conn = get_db_connection()
-    current_user = conn.execute('SELECT * FROM Moradores WHERE morador_id = ?', (user_id,)).fetchone()
+    current_user = conn.execute('SELECT * FROM Moradores WHERE morador_id = %s', (user_id,)).fetchone()
 
     if not current_user:
         return jsonify({'error': 'Usuário não autenticado'}), 401
     # --- FIM DA SIMULAÇÃO ---
 
     user_bloco_id = conn.execute("""
-        SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = ?
+        SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = %s
     """, (current_user['apartamento_id'],)).fetchone()['bloco_id']
 
     query = """
@@ -204,11 +204,11 @@ def get_complaints():
 
     if current_user['role'] == 'morador':
         # Morador comum vê apenas as suas próprias reclamações
-        query += " WHERE c.user_id = ?"
+        query += " WHERE c.user_id = %s"
         params.append(user_id)
     elif current_user['role'] == 'admin_bloco':
         # Admin de bloco vê todas as reclamações do seu bloco
-        query += " WHERE b.bloco_id = ?"
+        query += " WHERE b.bloco_id = %s"
         params.append(user_bloco_id)
     # Se for 'sindico', não adicionamos filtro, então ele vê todas
 
@@ -227,7 +227,7 @@ def update_complaint(complaint_id):
         return jsonify({'error': 'ID de usuário é obrigatório'}), 400
 
     conn = get_db_connection()
-    current_user = conn.execute('SELECT * FROM Moradores WHERE morador_id = ?', (user_id,)).fetchone()
+    current_user = conn.execute('SELECT * FROM Moradores WHERE morador_id = %s', (user_id,)).fetchone()
 
     if not current_user or current_user['role'] not in ('admin_bloco', 'sindico'):
         conn.close()
@@ -245,7 +245,7 @@ def update_complaint(complaint_id):
         # Lógica de segurança adicional para admin_bloco (opcional, mas recomendado)
         if current_user['role'] == 'admin_bloco':
             user_bloco_id = conn.execute("""
-                SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = ?
+                SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = %s
             """, (current_user['apartamento_id'],)).fetchone()['bloco_id']
             
             complaint_bloco_id = conn.execute("""
@@ -253,7 +253,7 @@ def update_complaint(complaint_id):
                 JOIN Moradores m ON c.user_id = m.morador_id
                 JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
                 JOIN Blocos b ON a.bloco_id = b.bloco_id
-                WHERE c.id = ?
+                WHERE c.id = %s
             """, (complaint_id,)).fetchone()['bloco_id']
 
             if user_bloco_id != complaint_bloco_id:
@@ -262,7 +262,7 @@ def update_complaint(complaint_id):
         # Se passou na verificação, atualiza o banco
         cursor = conn.cursor()
         cursor.execute(
-            "UPDATE Complaints SET status = ?, admin_comment = ? WHERE id = ?",
+            "UPDATE Complaints SET status = %s, admin_comment = %s WHERE id = %s",
             (new_status, admin_comment, complaint_id)
         )
         conn.commit()
