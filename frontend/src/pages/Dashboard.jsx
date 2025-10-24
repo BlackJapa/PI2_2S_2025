@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 // Adicionei um estilo para o cursor "pointer" para os status clicáveis
 const cursorPointerStyle = { cursor: 'pointer' };
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://condominio-transparente.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.render.com/deploy/srv-d3s0jbruibrs739j1iag?key=-nqpi5WvViI';
 
 export default function Dashboard() {
   const location = useLocation();
