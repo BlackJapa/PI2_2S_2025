@@ -15,6 +15,7 @@ import react from '@vitejs/plugin-react'
 
 // CONFIGURAÇÃO NOVA:
 export default defineConfig({
+  base: './',
   plugins: [react()],
   server: {
     proxy: {
