@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.render.com/deploy/srv-d3s0jbruibrs739j1iag?key=-nqpi5WvViI';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function Register() {
   const [nome, setNome] = useState("");
