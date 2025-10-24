@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { useState } from "react";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
+import Login from "./src/pages/Login";
+import Register from "./src/pages/Register";
+import Dashboard from "./src/pages/Dashboard";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
