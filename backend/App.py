@@ -105,41 +105,45 @@ def login():
         if conn:
             conn.close()
 
-@app.route('/api/users', methods=['GET'])
+app.route('/api/users', methods=['GET'])
 def get_users():
     """Busca e retorna uma lista de usuários com base nas permissões do requisitante."""
-    user_id = request.args.get('user_id', type=int)
-    if not user_id:
-        return jsonify({'error': 'ID de usuário é obrigatório'}), 400
-        
+    requesting_user_id = request.args.get('user_id', type=int) # ID de quem está pedindo
+    if not requesting_user_id:
+        return jsonify({'error': 'ID de usuário requisitante é obrigatório'}), 400
+
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            cursor.execute('SELECT * FROM Moradores WHERE morador_id = %s', (user_id,))
-            current_user = cursor.fetchone()
+            # Busca dados do usuário que está fazendo a requisição
+            cursor.execute('SELECT role, apartamento_id FROM Moradores WHERE morador_id = %s', (requesting_user_id,))
+            requesting_user = cursor.fetchone()
 
-            if not current_user:
-                return jsonify({'error': 'Usuário não autenticado'}), 401
+            if not requesting_user:
+                return jsonify({'error': 'Usuário requisitante não autenticado'}), 401
 
-            if current_user['role'] == 'morador':
-                return jsonify({'error': 'Acesso negado'}), 403
-
-            cursor.execute("""
-                SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = %s
-            """, (current_user['apartamento_id'],))
-            user_bloco_id = cursor.fetchone()['bloco_id']
-
+            # Define a query base para buscar todos os usuários
             query = """
                 SELECT m.morador_id as id, m.nome, m.email, m.role, b.numero_bloco as bloco,
-                       a.numero_apartamento as apartment, m.role
+                       a.numero_apartamento as apartment
                 FROM Moradores m
                 JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
                 JOIN Blocos b ON a.bloco_id = b.bloco_id
             """
             params = []
-            if current_user['role'] == 'admin_bloco':
+
+            # Filtra APENAS se o requisitante for admin_bloco
+            if requesting_user['role'] == 'admin_bloco':
+                cursor.execute("SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = %s", (requesting_user['apartamento_id'],))
+                user_bloco_id = cursor.fetchone()['bloco_id']
                 query += " WHERE b.bloco_id = %s"
                 params.append(user_bloco_id)
+            elif requesting_user['role'] == 'morador':
+                 # Morador comum não pode listar usuários
+                 return jsonify({'error': 'Acesso negado'}), 403
+            # Se for 'sindico', NENHUM filtro é aplicado, ele vê todos.
+
+            query += " ORDER BY b.numero_bloco, a.numero_apartamento" # Ordena para melhor visualização
 
             cursor.execute(query, params)
             users = cursor.fetchall()
@@ -224,6 +228,51 @@ def get_complaints():
             complaints = cursor.fetchall()
         return jsonify(complaints)
     except psycopg2.Error as e:
+        return jsonify({'error': f'Erro de banco de dados: {e}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@app.route('/api/users/<int:target_user_id>/role', methods=['PUT'])
+def update_user_role(target_user_id):
+    """Atualiza a role de um usuário alvo (apenas para o síndico)."""
+    requesting_user_id = request.args.get('user_id', type=int) # ID de quem está pedindo
+    if not requesting_user_id:
+        return jsonify({'error': 'ID de usuário requisitante é obrigatório'}), 400
+
+    data = request.get_json()
+    new_role = data.get('new_role')
+
+    if not new_role or new_role not in ('admin_bloco', 'morador'):
+        return jsonify({'error': 'Nova role inválida. Use "admin_bloco" ou "morador".'}), 400
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Verifica se quem está pedindo é o SÍNDICO
+            cursor.execute('SELECT role FROM Moradores WHERE morador_id = %s', (requesting_user_id,))
+            requesting_user = cursor.fetchone()
+
+            if not requesting_user or requesting_user['role'] != 'sindico':
+                return jsonify({'error': 'Acesso negado. Apenas o Super Admin pode alterar roles.'}), 403
+
+            # 2. Verifica se o usuário alvo existe
+            cursor.execute('SELECT role FROM Moradores WHERE morador_id = %s', (target_user_id,))
+            target_user = cursor.fetchone()
+            if not target_user:
+                return jsonify({'error': 'Usuário alvo não encontrado.'}), 404
+
+            # 3. Impede o síndico de mudar a própria role
+            if int(requesting_user_id) == int(target_user_id):
+                 return jsonify({'error': 'O Super Admin não pode alterar a própria role.'}), 400
+
+            # 4. Atualiza a role do usuário alvo
+            cursor.execute("UPDATE Moradores SET role = %s WHERE morador_id = %s", (new_role, target_user_id))
+            conn.commit()
+
+        return jsonify({'message': f'Role do usuário {target_user_id} atualizada para {new_role}.'}), 200
+    except psycopg2.Error as e:
+        conn.rollback()
         return jsonify({'error': f'Erro de banco de dados: {e}'}), 500
     finally:
         if conn:

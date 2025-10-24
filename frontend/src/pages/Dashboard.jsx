@@ -114,6 +114,116 @@ export default function Dashboard() {
     }
   };
 
+  const handleChangeRole = async (targetUserId, targetUserName, newRole) => {
+    // Confirmação dupla para evitar cliques acidentais
+    const actionText = newRole === 'admin_bloco' ? 'promover' : 'rebaixar';
+    if (!confirm(`Tem certeza que deseja ${actionText} ${targetUserName} para ${newRole}?`)) {
+      return;
+    }
+
+    setIsLoading(true); // Reutiliza o estado de loading
+    try {
+      const response = await fetch(`${API_URL}/api/users/${targetUserId}/role?user_id=${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_role: newRole }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert(data.message || "Role atualizada com sucesso!");
+        fetchUsers(); // Atualiza a lista de usuários para refletir a mudança
+      } else {
+        alert(`Erro: ${data.error || 'Não foi possível atualizar a role.'}`);
+      }
+    } catch (error) {
+      console.error("Erro de conexão ao mudar role:", error);
+      alert("Erro ao conectar com o servidor.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  
+// --- ATUALIZAÇÃO DA RENDERIZAÇÃO DA TABELA DE USUÁRIOS ---
+  if (view === "manage" && user.is_admin) {
+    return (
+      <div className="text-center">
+        <h2>Gerenciamento de Moradores</h2>
+        {/* Mensagem diferente dependendo se é sindico ou admin_bloco */}
+        {user.role === 'sindico' ? (
+          <p>Você (Super Admin) está vendo todos os moradores.</p>
+        ) : (
+          <p>Você (Admin Bloco {user.bloco}) está vendo os moradores do seu bloco.</p>
+        )}
+        <div className="table-responsive">
+          <table className="table table-striped table-hover"> {/* Adicionado table-hover */}
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Bloco</th>
+                <th>Apto</th>
+                <th>Função</th>
+                {/* Coluna de Ações visível apenas para o SINDICO */}
+                {user.role === 'sindico' && <th>Ações</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                // Destaca a linha do próprio admin logado (opcional)
+                <tr key={u.id} className={u.id === user.id ? 'table-info' : ''}>
+                  <td>{u.nome}</td>
+                  <td>{u.email}</td>
+                  <td>{u.bloco}</td>
+                  <td>{u.apartment}</td>
+                  <td>
+                    <span className={`badge ${u.role === 'sindico' ? 'bg-danger' : u.role === 'admin_bloco' ? 'bg-warning' : 'bg-info'}`}>
+                      {u.role === 'sindico' ? 'Super Admin' : u.role === 'admin_bloco' ? 'Admin Bloco' : 'Morador'}
+                    </span>
+                  </td>
+                  {/* Botões de Ação visíveis apenas para o SINDICO e não para ele mesmo */}
+                  {user.role === 'sindico' && (
+                    <td>
+                      {u.id !== user.id && u.role !== 'sindico' && ( // Não mostra botões para o próprio síndico ou outros síndicos
+                        <>
+                          {u.role === 'morador' ? (
+                            <button
+                              className="btn btn-sm btn-success me-1"
+                              onClick={() => handleChangeRole(u.id, u.nome, 'admin_bloco')}
+                              disabled={isLoading}
+                              title={`Promover ${u.nome} a Admin do Bloco ${u.bloco}`}
+                            >
+                              Promover
+                            </button>
+                          ) : ( // Se for 'admin_bloco'
+                            <button
+                              className="btn btn-sm btn-danger me-1"
+                              onClick={() => handleChangeRole(u.id, u.nome, 'morador')}
+                              disabled={isLoading}
+                              title={`Rebaixar ${u.nome} a Morador`}
+                            >
+                              Rebaixar
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {/* Mostra um texto se for o próprio síndico */}
+                      {u.id === user.id && u.role === 'sindico' && (
+                          <span className="text-muted fst-italic">Você</span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button className="btn btn-secondary mt-3" onClick={() => setView("menu")}>Voltar</button>
+      </div>
+    );
+  }
   // --- RENDERIZAÇÃO CONDICIONAL ---
 
   if (view === "menu") {
