@@ -52,10 +52,10 @@ def setup_database():
             print("Tabelas verificadas/criadas com sucesso.")
 
             # ALTERAÇÃO: O loop agora começa em 0 para incluir o bloco do administrador.
-         cursor.execute("SELECT COUNT(*) FROM Blocos")
-            count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM Blocos")
+        count = cursor.fetchone()[0]
             
-            if count == 0:
+        if count == 0:
                 print("\nBanco de dados vazio. Populando blocos...")
                 for i in range(0, 41): # De 0 a 40
                     cursor.execute("INSERT INTO Blocos (numero_bloco) VALUES (%s)", (i,))
@@ -80,8 +80,8 @@ def setup_database():
                             cursor.execute("INSERT INTO Apartamentos (numero_apartamento, bloco_id) VALUES (%s, %s)", (num_ap, bloco_id))
                 
                 print("Dados iniciais inseridos.")
-            else:
-                print("O banco de dados já está populado. Nenhuma ação necessária.")
+        else:
+            print("O banco de dados já está populado. Nenhuma ação necessária.")
 
         conn.commit()
 
