@@ -1,0 +1,215 @@
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  margin-top: 56px; /* Altura da navbar */
+  margin-bottom: 56px; /* Altura do footer */
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+  width: 100%;
+  max-width: 600px;
+  background-color: #8B4513; /* Cor parda */
+  border: 2px solid #654321;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* Navbar e Footer customizados - Vermelho ferrugíneo */
+.navbar-custom {
+  background-color: #8B0000; /* Vermelho ferrugíneo */
+  border-bottom: 1px solid #660000;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  color: white;
+}
+
+.navbar-brand {
+  color: white !important;
+  font-weight: bold;
+}
+
+.footer-custom {
+  background-color: #8B0000; /* Vermelho ferrugíneo */
+  border-top: 1px solid #660000;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  height: 56px;
+}
+
+/* Responsividade adicional */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+    margin-top: 56px;
+    margin-bottom: 56px;
+  }
+  
+  .card {
+    padding: 1em;
+  }
+}
+
+/* Modo Alto Contraste - Baseado nas diretrizes W3C */
+.high-contrast {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .card {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 3px solid #ffff00 !important;
+}
+
+.high-contrast .navbar-custom {
+  background-color: #000000 !important;
+  border-bottom: 3px solid #ffff00 !important;
+}
+
+.high-contrast .footer-custom {
+  background-color: #000000 !important;
+  border-top: 3px solid #ffff00 !important;
+}
+
+.high-contrast .form-control {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffff00 !important;
+}
+
+.high-contrast .form-control::placeholder {
+  color: #cccccc !important;
+}
+
+.high-contrast .btn {
+  border: 2px solid #ffff00 !important;
+  font-weight: bold;
+}
+
+.high-contrast .btn-primary {
+  background-color: #0000ff !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .btn-secondary {
+  background-color: #666666 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .btn-success {
+  background-color: #008000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .btn-warning {
+  background-color: #ffa500 !important;
+  color: #000000 !important;
+}
+
+.high-contrast .btn-danger {
+  background-color: #ff0000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .table {
+  color: #ffffff !important;
+  border: 2px solid #ffff00 !important;
+}
+
+.high-contrast .table th {
+  background-color: #0000ff !important;
+  color: #ffffff !important;
+  border: 1px solid #ffff00 !important;
+}
+
+.high-contrast .table td {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 1px solid #ffff00 !important;
+}
+
+.high-contrast .badge {
+  font-weight: bold;
+  border: 1px solid #ffffff;
+}
+
+.high-contrast a {
+  color: #00ffff !important;
+  text-decoration: underline !important;
+}
+
+.high-contrast h1,
+.high-contrast h2,
+.high-contrast h3,
+.high-contrast h4,
+.high-contrast h5,
+.high-contrast h6 {
+  color: #ffff00 !important;
+  font-weight: bold !important;
+}
+
+/* Aumento de fonte no modo alto contraste */
+.high-contrast {
+  font-size: 1.1em;
+}
+
+.high-contrast .form-control {
+  font-size: 1.1em;
+}
+
+.high-contrast .btn {
+  font-size: 1.1em;
+  padding: 10px 20px;
+}
+
+/* Foco visível melhorado */
+.high-contrast *:focus {
+  outline: 3px solid #ffff00 !important;
+  outline-offset: 2px;
+}
