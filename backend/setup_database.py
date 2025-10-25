@@ -1,4 +1,4 @@
-"""
+""" vamos tentar melhorar
 Script para setup e população do banco de dados PostgreSQL do condomínio.
 """
 import os
