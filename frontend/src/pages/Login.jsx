@@ -13,11 +13,11 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    if (bloco && (bloco < 1 || bloco > 40)) {
+    if (bloco && (bloco < 0 || bloco > 40)) {
       alert("Bloco inválido! Digite um valor de 1 a 40.");
       return;
     }
-    if (apartamento && (apartamento < 1 || apartamento > 126)) {
+    if (apartamento && (apartamento < 0 || apartamento > 126)) {
       alert("Apartamento inválido! Digite um valor de 1 a 126.");
       return;
     }
