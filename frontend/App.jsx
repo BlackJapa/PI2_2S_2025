@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Login from "./src/pages/Login";
 import Register from "./src/pages/Register";
 import Dashboard from "./src/pages/Dashboard";
