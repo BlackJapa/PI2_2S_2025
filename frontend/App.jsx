@@ -9,11 +9,6 @@ import './index.css';
 
 function App() {
   const [highContrast, setHighContrast] = useState(false);
-import './App.css';
-import './index.css'; // Garante que index.css seja carregado
-
-function App() {
-  const [highContrast, setHighContrast] = useState(false);
 
   // Efeito para adicionar/remover a classe do body
   useEffect(() => {
