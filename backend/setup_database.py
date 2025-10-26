@@ -19,12 +19,7 @@ def setup_database():
         conn = psycopg2.connect(DATABASE_URL)
         with conn.cursor() as cursor: # <-- Bloco 'with' começa aqui
             print("Verificando e criando tabelas (se não existirem)...")
-
-            # --- ADICIONE ESTA LINHA TEMPORARIAMENTE ---
-            print("!! ATENÇÃO: Apagando tabelas existentes !!") 
-            cursor.execute("DROP TABLE IF EXISTS Complaints, Moradores, Apartamentos, Blocos CASCADE;")
-            # -------------------------------------------
-            
+           
             # Criação das tabelas
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS Blocos (
