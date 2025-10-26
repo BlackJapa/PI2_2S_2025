@@ -1,4 +1,3 @@
-/* App.css Atualizado */
 #root {
   min-height: 100vh;
   display: flex;
@@ -12,72 +11,94 @@
   justify-content: center;
   align-items: center;
   padding: 2rem;
-  margin-top: 60px; /* Leve aumento para espaço */
-  margin-bottom: 60px; /* Leve aumento para espaço */
+  margin-top: 56px; /* Altura da navbar */
+  margin-bottom: 56px; /* Altura do footer */
 }
 
-/* Card Modernizado */
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
 .card {
-  padding: 2.5em; /* Mais padding interno */
+  padding: 2em;
   width: 100%;
   max-width: 600px;
-  background-color: var(--color-card-background); /* Usa variável */
-  border: 1px solid var(--color-border); /* Borda suave com variável */
-  border-radius: 8px; /* Bordas mais suaves */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Sombra mais suave */
-  color: var(--color-text); /* Garante cor do texto correta */
+  background-color: #8B4513; /* Cor parda */
+  border: 2px solid #654321;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Navbar e Footer Modernizados */
+.read-the-docs {
+  color: #888;
+}
+
+/* Navbar e Footer customizados - Vermelho ferrugíneo */
 .navbar-custom {
-  background-color: var(--color-navbar-footer-bg); /* Usa variável */
-  /* Pode usar uma borda sutil ou sombra */
-  border-bottom: 1px solid var(--color-border); 
-  /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); */
+  background-color: #8B0000; /* Vermelho ferrugíneo */
+  border-bottom: 1px solid #660000;
   position: fixed;
   top: 0;
   width: 100%;
   z-index: 1000;
-  height: 60px; /* Altura definida */
-  display: flex; /* Para alinhar itens */
-  align-items: center; /* Alinha verticalmente */
+  color: white;
 }
 
 .navbar-brand {
-  color: var(--color-text) !important; /* Usa variável e !important para sobrescrever Bootstrap */
+  color: white !important;
   font-weight: bold;
 }
 
 .footer-custom {
-  background-color: var(--color-navbar-footer-bg); /* Usa variável */
-  border-top: 1px solid var(--color-border);
+  background-color: #8B0000; /* Vermelho ferrugíneo */
+  border-top: 1px solid #660000;
   position: fixed;
   bottom: 0;
   width: 100%;
-  height: 60px; /* Altura definida */
+  height: 56px;
 }
 
-/* Ajustes Responsivos (mantidos, mas usando alturas atualizadas) */
+/* Responsividade adicional */
 @media (max-width: 768px) {
   .main-content {
     padding: 1rem;
-    margin-top: 60px; 
-    margin-bottom: 60px; 
+    margin-top: 56px;
+    margin-bottom: 56px;
   }
   
   .card {
-    padding: 1.5em; /* Ajusta padding para telas menores */
+    padding: 1em;
   }
 }
 
-/* ---- MODO ALTO CONTRASTE ---- */
-/* Revisado para garantir que sobrescreva as variáveis se necessário */
-/* Mantive a maioria das cores, focando na acessibilidade */
-
+/* Modo Alto Contraste - Baseado nas diretrizes W3C */
 .high-contrast {
   background-color: #000000 !important;
   color: #ffffff !important;
-  font-size: 1.1em; /* Aumento de fonte movido para a classe base */
 }
 
 .high-contrast .card {
@@ -91,12 +112,6 @@
   border-bottom: 3px solid #ffff00 !important;
 }
 
-/* Certifica que o texto da marca na navbar fique visível */
-.high-contrast .navbar-brand {
-   color: #ffffff !important; 
-}
-
-
 .high-contrast .footer-custom {
   background-color: #000000 !important;
   border-top: 3px solid #ffff00 !important;
@@ -106,34 +121,41 @@
   background-color: #000000 !important;
   color: #ffffff !important;
   border: 2px solid #ffff00 !important;
-  font-size: 1em; /* Resetar ou ajustar fonte do input */
 }
 
 .high-contrast .form-control::placeholder {
   color: #cccccc !important;
 }
 
-.high-contrast button, 
 .high-contrast .btn {
   border: 2px solid #ffff00 !important;
   font-weight: bold;
-  font-size: 1em; /* Resetar ou ajustar fonte do botão */
-  padding: 10px 20px;
 }
 
-/* Mantém cores específicas de alto contraste para botões */
-.high-contrast .btn-primary { background-color: #0000ff !important; color: #ffffff !important; }
-.high-contrast .btn-secondary { background-color: #666666 !important; color: #ffffff !important; }
-.high-contrast .btn-success { background-color: #008000 !important; color: #ffffff !important; }
-.high-contrast .btn-warning { background-color: #ffa500 !important; color: #000000 !important; }
-.high-contrast .btn-danger { background-color: #ff0000 !important; color: #ffffff !important; }
-.high-contrast button:disabled, 
-.high-contrast .btn:disabled {
-    background-color: #333 !important;
-    color: #888 !important;
-    border-color: #888 !important;
+.high-contrast .btn-primary {
+  background-color: #0000ff !important;
+  color: #ffffff !important;
 }
 
+.high-contrast .btn-secondary {
+  background-color: #666666 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .btn-success {
+  background-color: #008000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .btn-warning {
+  background-color: #ffa500 !important;
+  color: #000000 !important;
+}
+
+.high-contrast .btn-danger {
+  background-color: #ff0000 !important;
+  color: #ffffff !important;
+}
 
 .high-contrast .table {
   color: #ffffff !important;
@@ -141,7 +163,7 @@
 }
 
 .high-contrast .table th {
-  background-color: #0000ff !important; /* Azul como cor primária forte */
+  background-color: #0000ff !important;
   color: #ffffff !important;
   border: 1px solid #ffff00 !important;
 }
@@ -155,17 +177,10 @@
 .high-contrast .badge {
   font-weight: bold;
   border: 1px solid #ffffff;
-  color: #000 !important; /* Garante leitura em fundos coloridos */
 }
-/* Cores específicas para badges em alto contraste */
-.high-contrast .bg-danger { background-color: #ff0000 !important; }
-.high-contrast .bg-warning { background-color: #ffa500 !important; }
-.high-contrast .bg-success { background-color: #008000 !important; }
-.high-contrast .bg-info { background-color: #00ffff !important; }
-
 
 .high-contrast a {
-  color: #00ffff !important; /* Ciano para links */
+  color: #00ffff !important;
   text-decoration: underline !important;
 }
 
@@ -175,11 +190,25 @@
 .high-contrast h4,
 .high-contrast h5,
 .high-contrast h6 {
-  color: #ffff00 !important; /* Amarelo para títulos */
+  color: #ffff00 !important;
   font-weight: bold !important;
 }
 
-/* Foco visível melhorado (mantido) */
+/* Aumento de fonte no modo alto contraste */
+.high-contrast {
+  font-size: 1.1em;
+}
+
+.high-contrast .form-control {
+  font-size: 1.1em;
+}
+
+.high-contrast .btn {
+  font-size: 1.1em;
+  padding: 10px 20px;
+}
+
+/* Foco visível melhorado */
 .high-contrast *:focus {
   outline: 3px solid #ffff00 !important;
   outline-offset: 2px;
