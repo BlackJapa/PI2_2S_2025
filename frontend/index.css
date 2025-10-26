@@ -1,23 +1,35 @@
-/* index.css Atualizado */
+/* index.css - Tema Claro Moderno (Azul/Verde) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  line-height: 1.6; /* Leve aumento para melhor leitura */
   font-weight: 400;
+  font-size: 16px; /* Tamanho base padrão */
 
-  /* Cores Padrão (Dark Mode) */
-  --color-background: #1a1d21; /* Um cinza escuro mais suave */
-  --color-text: rgba(255, 255, 255, 0.87);
-  --color-primary: #646cff; /* Roxo/Azul do Vite - pode mudar se quiser */
-  --color-primary-hover: #535bf2;
-  --color-card-background: #24272c; /* Fundo do card um pouco mais claro */
-  --color-border: #3a3f47; /* Cor de borda sutil */
-  --color-navbar-footer-bg: #202327;
-  --color-th-text: #e0e0e0; /* Texto do cabeçalho da tabela */
-  --color-td-text: #cccccc; /* Texto das células da tabela */
+  /* --- Nova Paleta de Cores (Tema Claro) --- */
+  --color-background: #f8f9fa; /* Branco levemente acinzentado */
+  --color-text: #212529; /* Preto suave */
+  --color-text-secondary: #6c757d; /* Cinza para texto secundário */
+  
+  --color-primary: #0d6efd; /* Azul Bootstrap como primário */
+  --color-primary-hover: #0b5ed7;
+  --color-primary-light: #cfe2ff; /* Azul bem claro para fundos sutis */
 
-  color-scheme: light dark;
+  --color-success: #198754; /* Verde Bootstrap como sucesso/accento */
+  --color-success-light: #d1e7dd; /* Verde claro */
+
+  --color-card-background: #ffffff; /* Card branco puro */
+  --color-border: #dee2e6; /* Cinza claro para bordas */
+  --color-navbar-footer-bg: #ffffff; /* Navbar/footer branco */
+
+  --color-th-bg: #f8f9fa; /* Fundo do header da tabela igual ao fundo geral */
+  --color-th-text: #495057; /* Texto do header da tabela */
+  --color-table-row-hover: #e9ecef; /* Cor suave para hover na linha da tabela */
+
+
+  /* Configurações padrão */
+  color-scheme: light; /* Força o modo claro como base */
   color: var(--color-text);
   background-color: var(--color-background);
 
@@ -27,123 +39,242 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-h2 {
-  /* Pode usar a cor primária ou manter branco/preto dependendo do tema */
-  color: var(--color-primary); 
-  padding-bottom: 1rem;
-  font-weight: 700; /* Mais destaque */
-}
-
-/* Estilos de Tabela Atualizados */
-th {
-  color: var(--color-th-text);
-  background-color: var(--color-card-background); /* Fundo sutil */
-  padding: 0.8em 1em;
-  border-bottom: 2px solid var(--color-primary); /* Borda inferior primária */
-  text-align: left;
-}
-
-td {
-  color: var(--color-td-text);
-  padding: 0.8em 1em;
-  border-bottom: 1px solid var(--color-border); /* Borda mais suave */
-}
-
-/* Opcional: Efeito zebra na tabela */
-tbody tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.03); /* Leve destaque em linhas pares */
-}
-
-
-a {
-  font-weight: 500;
-  color: var(--color-primary);
-  text-decoration: none; /* Remover sublinhado padrão */
-  transition: color 0.25s;
-}
-a:hover {
-  color: var(--color-primary-hover);
-  text-decoration: underline; /* Sublinhado apenas no hover */
-}
-
 body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
   min-width: 320px;
+  font-size: 1rem; /* Garante que 1em = 16px */
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Tipografia */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text);
+  margin-bottom: 0.75rem; /* Espaçamento padrão abaixo dos títulos */
+  font-weight: 700; /* Títulos em negrito */
 }
 
-/* Estilo Base de Botão Modernizado */
-button, .btn { /* Aplica a todos os botões e classes .btn */
-  border-radius: 6px; /* Bordas um pouco mais suaves */
-  border: 1px solid transparent;
+h2 {
+  font-size: 1.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border); /* Linha sutil abaixo do h2 principal */
+  margin-bottom: 1.5rem; /* Mais espaço após o título principal */
+  color: var(--color-primary); /* Título principal com cor primária */
+}
+
+p {
+  color: var(--color-text-secondary); /* Parágrafos com cor secundária */
+  margin-bottom: 1rem;
+}
+
+/* Links */
+a {
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+}
+a:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+/* Botões */
+button, .btn {
+  border-radius: 6px;
+  border: 1px solid var(--color-primary); /* Borda na cor primária */
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: var(--color-primary); /* Usa cor primária */
-  color: white; /* Texto branco para contraste */
+  background-color: var(--color-primary);
+  color: white;
   cursor: pointer;
-  transition: background-color 0.25s, border-color 0.25s;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.1s ease-in-out;
   text-align: center;
-  display: inline-block; /* Garante alinhamento correto */
-  text-decoration: none; /* Remove sublinhado se usado em links estilizados como botão */
+  display: inline-block;
+  text-decoration: none;
 }
 button:hover, .btn:hover {
   background-color: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
 }
+/* Botão secundário (Ex: Cancelar) */
+.btn-secondary {
+  background-color: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+.btn-secondary:hover {
+  background-color: #e9ecef; /* Fundo cinza claro no hover */
+  border-color: #adb5bd;
+  color: var(--color-text);
+}
+/* Botão de sucesso (Ex: Enviar) */
+.btn-success {
+    background-color: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+}
+.btn-success:hover {
+    background-color: #157347; /* Verde mais escuro */
+    border-color: #146c43;
+}
+/* Botão de perigo (Ex: Rebaixar) */
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+.btn-danger:hover {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+}
+/* Botão de aviso (Ex: Gerenciar) */
+.btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000; /* Texto preto para contraste com amarelo */
+}
+.btn-warning:hover {
+    background-color: #ffca2c;
+    border-color: #ffc720;
+}
+
+
+button:disabled, .btn:disabled {
+    background-color: #adb5bd; /* Cinza claro */
+    color: #f8f9fa; /* Texto quase branco */
+    cursor: not-allowed;
+    border-color: #adb5bd;
+    opacity: 0.65;
+}
 button:focus,
 button:focus-visible,
 .btn:focus,
 .btn:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-/* Desabilita o botão */
-button:disabled, .btn:disabled {
-    background-color: #555;
-    color: #aaa;
-    cursor: not-allowed;
-    border-color: transparent;
+  outline: 0; /* Remove outline padrão */
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); /* Foco estilo Bootstrap */
 }
 
+/* Formulários */
+.form-control {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem; /* Padding interno */
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: #fff; /* Fundo branco */
+  background-clip: padding-box;
+  border: 1px solid var(--color-border);
+  appearance: none;
+  border-radius: 6px;
+  transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+.form-control:focus {
+  color: var(--color-text);
+  background-color: #fff;
+  border-color: #86b7fe; /* Borda azul no foco */
+  outline: 0;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+.form-control::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+.form-select { /* Estilo base para dropdowns */
+    cursor: pointer;
+}
 
-/* Ajustes para o layout principal (mantido) */
+/* Tabelas */
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    color: var(--color-text);
+    vertical-align: top;
+    border-color: var(--color-border);
+    border-collapse: collapse; /* Garante que bordas fiquem juntas */
+}
+.table > :not(caption) > * > * { /* Aplica padding a th e td */
+    padding: 0.75rem 0.75rem;
+    background-color: transparent; /* Remove fundo padrão */
+    border-bottom-width: 1px;
+}
+.table thead {
+    vertical-align: bottom;
+}
+.table th {
+    font-weight: 500;
+    color: var(--color-th-text);
+    background-color: var(--color-th-bg);
+    border-bottom-width: 2px; /* Header com borda mais grossa */
+    text-align: inherit; /* Usa alinhamento padrão (left) */
+}
+/* Efeito Hover na Linha da Tabela */
+.table-hover > tbody > tr:hover > * {
+  background-color: var(--color-table-row-hover);
+}
+/* Efeito Zebra Suave */
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+  background-color: rgba(0, 0, 0, 0.02); /* Cinza muito sutil em linhas ímpares */
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: 0.35em 0.65em;
+    font-size: .75em;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.375rem; /* Borda suave */
+}
+/* Cores dos Badges */
+.bg-danger { background-color: #dc3545; }
+.bg-warning { background-color: #ffc107; color: #000 !important; } /* Texto preto no amarelo */
+.bg-success { background-color: var(--color-success); }
+.bg-info { background-color: #0dcaf0; } /* Ciano para info */
+
+
+/* Alertas */
+.alert {
+  position: relative;
+  padding: 1rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+}
+.alert-danger {
+  color: #842029;
+  background-color: #f8d7da;
+  border-color: #f5c2c7;
+}
+.alert-success {
+  color: #0f5132;
+  background-color: #d1e7dd;
+  border-color: #badbcc;
+}
+
+/* Utilitários */
+.cursor-pointer {
+  cursor: pointer;
+}
+.text-muted {
+  color: var(--color-text-secondary) !important;
+}
+.fst-italic {
+  font-style: italic !important;
+}
+
+/* Remover padding padrão do container-fluid */
 .container-fluid {
   padding: 0;
 }
 
-/* Ajustes para modo claro usando variáveis */
-@media (prefers-color-scheme: light) {
-  :root {
-    /* Cores Modo Claro */
-    --color-background: #f4f7f9; /* Branco levemente acinzentado */
-    --color-text: #213547;
-    --color-primary: #535bf2; /* Pode manter ou ajustar a cor primária */
-    --color-primary-hover: #434acf;
-    --color-card-background: #ffffff; /* Card branco */
-    --color-border: #e1e5e9; /* Borda cinza claro */
-    --color-navbar-footer-bg: #ffffff; /* Navbar/footer branco */
-    --color-th-text: #333; /* Texto escuro para cabeçalho */
-    --color-td-text: #555; /* Texto cinza escuro para células */
-  }
-  
-  /* Ajusta a cor do botão base no modo claro (se necessário) */
-  button, .btn {
-      /* Pode ajustar se a cor primária não contrastar bem com branco */
-      /* Ex: background-color: var(--color-primary); color: white; */
-  }
-
-  /* Ajusta o efeito zebra no modo claro */
-  tbody tr:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.03); 
-  }
-
-  /* Remove estilos antigos de cor fixa */
-  /* .navbar-custom, .footer-custom, .card já usarão variáveis */
-}
+/* Remove estilos de modo escuro - O tema base agora é claro */
+/* @media (prefers-color-scheme: dark) { ... } */
