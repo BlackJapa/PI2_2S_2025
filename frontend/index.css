@@ -1,11 +1,25 @@
+/* index.css Atualizado */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
+  /* Cores Padrão (Dark Mode) */
+  --color-background: #1a1d21; /* Um cinza escuro mais suave */
+  --color-text: rgba(255, 255, 255, 0.87);
+  --color-primary: #646cff; /* Roxo/Azul do Vite - pode mudar se quiser */
+  --color-primary-hover: #535bf2;
+  --color-card-background: #24272c; /* Fundo do card um pouco mais claro */
+  --color-border: #3a3f47; /* Cor de borda sutil */
+  --color-navbar-footer-bg: #202327;
+  --color-th-text: #e0e0e0; /* Texto do cabeçalho da tabela */
+  --color-td-text: #cccccc; /* Texto das células da tabela */
+
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: var(--color-text);
+  background-color: var(--color-background);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -14,27 +28,42 @@
 }
 
 h2 {
-  color: #fff;
+  /* Pode usar a cor primária ou manter branco/preto dependendo do tema */
+  color: var(--color-primary); 
   padding-bottom: 1rem;
+  font-weight: 700; /* Mais destaque */
 }
 
+/* Estilos de Tabela Atualizados */
 th {
-  color: #ffa;
-  }
+  color: var(--color-th-text);
+  background-color: var(--color-card-background); /* Fundo sutil */
+  padding: 0.8em 1em;
+  border-bottom: 2px solid var(--color-primary); /* Borda inferior primária */
+  text-align: left;
+}
 
 td {
-  color: #dcdcdc;
-  border-bottom: 1px dashed gray;
-}  
+  color: var(--color-td-text);
+  padding: 0.8em 1em;
+  border-bottom: 1px solid var(--color-border); /* Borda mais suave */
+}
+
+/* Opcional: Efeito zebra na tabela */
+tbody tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.03); /* Leve destaque em linhas pares */
+}
 
 
 a {
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: var(--color-primary);
+  text-decoration: none; /* Remover sublinhado padrão */
+  transition: color 0.25s;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--color-primary-hover);
+  text-decoration: underline; /* Sublinhado apenas no hover */
 }
 
 body {
@@ -49,57 +78,72 @@ h1 {
   line-height: 1.1;
 }
 
-button {
-  border-radius: 8px;
+/* Estilo Base de Botão Modernizado */
+button, .btn { /* Aplica a todos os botões e classes .btn */
+  border-radius: 6px; /* Bordas um pouco mais suaves */
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--color-primary); /* Usa cor primária */
+  color: white; /* Texto branco para contraste */
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: background-color 0.25s, border-color 0.25s;
+  text-align: center;
+  display: inline-block; /* Garante alinhamento correto */
+  text-decoration: none; /* Remove sublinhado se usado em links estilizados como botão */
 }
-button:hover {
-  border-color: #646cff;
+button:hover, .btn:hover {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 button:focus,
-button:focus-visible {
+button:focus-visible,
+.btn:focus,
+.btn:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+/* Desabilita o botão */
+button:disabled, .btn:disabled {
+    background-color: #555;
+    color: #aaa;
+    cursor: not-allowed;
+    border-color: transparent;
+}
 
-/* Ajustes para o layout principal */
+
+/* Ajustes para o layout principal (mantido) */
 .container-fluid {
   padding: 0;
 }
 
-/* Ajustes para modo claro */
+/* Ajustes para modo claro usando variáveis */
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-    color: #213547;
-  }
-  
-  .navbar-custom {
-    background-color: #8B0000; /* Mantém vermelho ferrugíneo no modo claro */
-    border-bottom: 1px solid #660000;
-    color: white;
+    /* Cores Modo Claro */
+    --color-background: #f4f7f9; /* Branco levemente acinzentado */
+    --color-text: #213547;
+    --color-primary: #535bf2; /* Pode manter ou ajustar a cor primária */
+    --color-primary-hover: #434acf;
+    --color-card-background: #ffffff; /* Card branco */
+    --color-border: #e1e5e9; /* Borda cinza claro */
+    --color-navbar-footer-bg: #ffffff; /* Navbar/footer branco */
+    --color-th-text: #333; /* Texto escuro para cabeçalho */
+    --color-td-text: #555; /* Texto cinza escuro para células */
   }
   
-  .footer-custom {
-    background-color: #8B0000; /* Mantém vermelho ferrugíneo no modo claro */
-    border-top: 1px solid #660000;
+  /* Ajusta a cor do botão base no modo claro (se necessário) */
+  button, .btn {
+      /* Pode ajustar se a cor primária não contrastar bem com branco */
+      /* Ex: background-color: var(--color-primary); color: white; */
   }
-  
-  .card {
-    background-color: #8B4513; /* Mantém cor parda no modo claro */
-    color: white;
+
+  /* Ajusta o efeito zebra no modo claro */
+  tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.03); 
   }
+
+  /* Remove estilos antigos de cor fixa */
+  /* .navbar-custom, .footer-custom, .card já usarão variáveis */
 }
