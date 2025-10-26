@@ -67,6 +67,24 @@ def register():
         if conn:
             conn.close()
 
+@app.route('/api/blocks', methods=['GET'])
+def get_blocks():
+    """Retorna uma lista de todos os blocos cadastrados."""
+    # (Opcional: Adicionar verificação se o usuário está logado, se necessário)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Seleciona ID e número, ordenando pelo número
+            cursor.execute("SELECT bloco_id, numero_bloco FROM Blocos ORDER BY numero_bloco")
+            blocos = cursor.fetchall()
+        # Retorna a lista de dicionários [{bloco_id: 1, numero_bloco: 0}, ...]
+        return jsonify(blocos)
+    except psycopg2.Error as e:
+        return jsonify({'error': f'Erro ao buscar blocos: {e}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
 @app.route('/api/login', methods=['POST'])
 def login():
     """Autentica um usuário e retorna seus dados se as credenciais forem válidas."""
@@ -105,24 +123,25 @@ def login():
         if conn:
             conn.close()
 
-app.route('/api/users', methods=['GET'])
+@app.route('/api/users', methods=['GET'])
 def get_users():
-    """Busca e retorna uma lista de usuários com base nas permissões do requisitante."""
-    requesting_user_id = request.args.get('user_id', type=int) # ID de quem está pedindo
+    """Busca e retorna uma lista de usuários com base nas permissões e filtro de bloco."""
+    requesting_user_id = request.args.get('user_id', type=int)
+    # NOVO: Pega o filtro de bloco dos parâmetros da URL, se existir
+    selected_bloco_id = request.args.get('bloco_id_filter', type=int, default=None)
+
     if not requesting_user_id:
         return jsonify({'error': 'ID de usuário requisitante é obrigatório'}), 400
 
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # Busca dados do usuário que está fazendo a requisição
             cursor.execute('SELECT role, apartamento_id FROM Moradores WHERE morador_id = %s', (requesting_user_id,))
             requesting_user = cursor.fetchone()
 
             if not requesting_user:
                 return jsonify({'error': 'Usuário requisitante não autenticado'}), 401
 
-            # Define a query base para buscar todos os usuários
             query = """
                 SELECT m.morador_id as id, m.nome, m.email, m.role, b.numero_bloco as bloco,
                        a.numero_apartamento as apartment
@@ -131,19 +150,29 @@ def get_users():
                 JOIN Blocos b ON a.bloco_id = b.bloco_id
             """
             params = []
+            where_clauses = [] # Lista para adicionar condições WHERE
 
-            # Filtra APENAS se o requisitante for admin_bloco
-            if requesting_user['role'] == 'admin_bloco':
+            # Lógica de Filtro:
+            if requesting_user['role'] == 'sindico':
+                # Se SINDICO e um filtro foi selecionado, adiciona o filtro
+                if selected_bloco_id is not None:
+                    where_clauses.append("b.bloco_id = %s")
+                    params.append(selected_bloco_id)
+                # Se SINDICO e NENHUM filtro foi selecionado, não adiciona cláusula (vê todos)
+            elif requesting_user['role'] == 'admin_bloco':
+                # Se ADMIN_BLOCO, filtra SEMPRE pelo seu próprio bloco
                 cursor.execute("SELECT a.bloco_id FROM Apartamentos a WHERE a.apartamento_id = %s", (requesting_user['apartamento_id'],))
                 user_bloco_id = cursor.fetchone()['bloco_id']
-                query += " WHERE b.bloco_id = %s"
+                where_clauses.append("b.bloco_id = %s")
                 params.append(user_bloco_id)
-            elif requesting_user['role'] == 'morador':
-                 # Morador comum não pode listar usuários
+            else: # Morador comum
                  return jsonify({'error': 'Acesso negado'}), 403
-            # Se for 'sindico', NENHUM filtro é aplicado, ele vê todos.
 
-            query += " ORDER BY b.numero_bloco, a.numero_apartamento" # Ordena para melhor visualização
+            # Monta a query final com as cláusulas WHERE, se houver
+            if where_clauses:
+                query += " WHERE " + " AND ".join(where_clauses)
+
+            query += " ORDER BY b.numero_bloco, a.numero_apartamento"
 
             cursor.execute(query, params)
             users = cursor.fetchall()
