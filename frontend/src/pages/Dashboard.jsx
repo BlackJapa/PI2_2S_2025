@@ -7,7 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 export default function Dashboard() {
   const location = useLocation();
   // Garante um objeto user padrão robusto
-  const user = location.state || { email: "Visitante", id: null, role: 'morador', is_admin: false, bloco: 'N/A', apartment: 'N/A', bloco_id: null };
+  const user = location.state || { nome: "Visitante", id: null, role: 'morador', is_admin: false, bloco: 'N/A', apartment: 'N/A', bloco_id: null };
   // Log para verificar os dados do usuário ao carregar
   console.log("Dashboard carregado com dados do usuário:", user);
 
@@ -221,7 +221,7 @@ export default function Dashboard() {
   if (view === "menu") {
     return (
       <div className="text-center">
-        <h2>Bem-vindo, {user.email || 'Usuário'}!</h2>
+        <h2>Bem-vindo, {user.nome || 'Usuário'}!</h2>
         <p>Bloco: {user.bloco ?? 'N/A'} / Apto: {user.apartment ?? 'N/A'}</p>
         {user.is_admin && <p style={{ color: 'gold' }}><strong>👑 Modo Administrador ({user.role === 'sindico' ? 'Super Admin' : 'Admin Bloco'})</strong></p>}
         <button className="btn btn-primary m-2" onClick={() => setView("form")}>

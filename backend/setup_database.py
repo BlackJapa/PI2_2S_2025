@@ -87,11 +87,11 @@ def setup_database():
                 print(f"--> Apartamento do Síndico (ID: {apto_sindico_id}) criado.")
 
                 # --- CORREÇÃO DE ORDEM: Define as variáveis ANTES de usar ---
-                print("-> Preparando dados do usuário Síndico...")
-                sindico_nome = "Yuri H"
-                sindico_email = "yuri.hamano@gmail.com"
-                sindico_senha_plain = "Hamano152047"
-                sindico_senha_hash = generate_password_hash(sindico_senha_plain)
+                #print("-> Preparando dados do usuário Síndico...")
+                #sindico_nome = "Yuri H"
+                #sindico_email = "yuri.hamano@gmail.com"
+                #sindico_senha_plain = "Hamano152047"
+                #sindico_senha_hash = generate_password_hash(sindico_senha_plain)
 
                 # --- Tenta criar o usuário SÍNDICO ---
                 try:

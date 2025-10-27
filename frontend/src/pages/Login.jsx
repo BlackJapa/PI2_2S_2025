@@ -37,6 +37,7 @@ export default function Login() {
         navigate("/dashboard", {
           state: { 
             id: data.id,
+            nome: data.nome,
             email: data.email, 
             bloco: data.bloco, 
             apartment: data.apartment,

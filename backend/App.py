@@ -108,6 +108,7 @@ def login():
 
                 return jsonify({
                     'id': morador['morador_id'],
+                    'nome': morador['nome'],
                     'email': morador['email'],
                     'is_admin': morador['role'] in ('sindico', 'admin_bloco'),
                     'role': morador['role'],
