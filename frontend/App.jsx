@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Login from "./src/pages/Login";
 import Register from "./src/pages/Register";
 import Dashboard from "./src/pages/Dashboard";
-import Integrantes from './pages/Integrantes';
+import Integrantes from "./pages/Integrantes";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import './index.css';
