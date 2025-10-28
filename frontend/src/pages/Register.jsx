@@ -191,6 +191,7 @@ export default function Register() {
           <button type="submit" className="btn btn-primary w-100" disabled={isLoading}>
             {isLoading ? 'Cadastrando...' : 'Cadastrar'}
           </button>
+          </div>
         </form>
         <p className="mt-3">
           Já tem conta? <Link to="/">Entrar</Link>
