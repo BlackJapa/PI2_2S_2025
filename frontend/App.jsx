@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Login from "./src/pages/Login";
 import Register from "./src/pages/Register";
 import Dashboard from "./src/pages/Dashboard";
+import Integrantes from './pages/Integrantes';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import './index.css';
@@ -47,7 +48,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              {/* Removido o DashboardWrapper - Passar props diretamente ou usar Context API */}
+              <Route path="/integrantes" element={<Integrantes />} />
               <Route path="/dashboard" element={<Dashboard />} /> 
             </Routes>
           </div>

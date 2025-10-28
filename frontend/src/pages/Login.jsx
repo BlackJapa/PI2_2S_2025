@@ -97,8 +97,10 @@ export default function Login() {
         </p>
         <div className="mt-3 p-2 bg-light rounded">
           <small>
-            <strong>Admin:</strong> admin@condominio.com / admin123<br/>
-            <em>Bloco e apartamento opcionais para admin</em>
+            <p style={{ textAlign: 'center', fontSize: '0.9em', color: '#555' }}>
+                Esse trabalho foi feito pelo <Link to="/integrantes">grupo 21</Link>, 
+                da faculdade <a href="https://univesp.br" target="_blank" rel="noopener noreferrer">Univesp</a>.
+            </p>
           </small>
         </div>
       </div>
