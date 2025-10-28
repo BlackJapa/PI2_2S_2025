@@ -308,6 +308,83 @@ def update_user_role(target_user_id):
         if conn:
             conn.close()
 
+@app.route('/api/users/<int:target_user_id>', methods=['DELETE'])
+def delete_user(target_user_id):
+    """Exclui um morador. (Apenas para Admins)."""
+    
+    # 1. Obter o ID do admin que está fazendo a requisição
+    requesting_user_id = request.args.get('user_id', type=int)
+    if not requesting_user_id:
+        return jsonify({'error': 'ID de usuário requisitante é obrigatório'}), 400
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 2. Buscar dados do admin requisitante
+            cursor.execute(
+                'SELECT morador_id, role, apartamento_id FROM Moradores WHERE morador_id = %s', 
+                (requesting_user_id,)
+            )
+            requesting_user = cursor.fetchone()
+
+            if not requesting_user or requesting_user['role'] not in ('sindico', 'admin_bloco'):
+                return jsonify({'error': 'Acesso negado. Apenas administradores podem excluir usuários.'}), 403
+
+            # 3. Buscar dados do usuário alvo (que será excluído)
+            cursor.execute(
+                'SELECT morador_id, role, apartamento_id FROM Moradores WHERE morador_id = %s', 
+                (target_user_id,)
+            )
+            target_user = cursor.fetchone()
+
+            if not target_user:
+                return jsonify({'error': 'Usuário alvo não encontrado.'}), 404
+
+            # --- REGRAS DE AUTORIZAÇÃO ---
+            
+            # Regra 1: Ninguém pode se auto-excluir
+            if int(requesting_user_id) == int(target_user_id):
+                 return jsonify({'error': 'Você não pode excluir a si mesmo.'}), 400
+            
+            # Regra 2: Ninguém pode excluir um Super Admin
+            if target_user['role'] == 'sindico':
+                return jsonify({'error': 'Não é permitido excluir um Super Admin.'}), 403
+
+            # Regra 3: 'admin_bloco' só pode excluir usuários do seu bloco
+            if requesting_user['role'] == 'admin_bloco':
+                # Busca o ID do bloco do admin
+                cursor.execute("SELECT bloco_id FROM Apartamentos WHERE apartamento_id = %s", (requesting_user['apartamento_id'],))
+                requesting_user_bloco_id = cursor.fetchone()['bloco_id']
+                
+                # Busca o ID do bloco do alvo
+                cursor.execute("SELECT bloco_id FROM Apartamentos WHERE apartamento_id = %s", (target_user['apartamento_id'],))
+                target_user_bloco_id = cursor.fetchone()['bloco_id']
+
+                if requesting_user_bloco_id != target_user_bloco_id:
+                    return jsonify({'error': 'Administradores de bloco só podem excluir moradores do seu próprio bloco.'}), 403
+
+            # 4. EXECUTAR EXCLUSÃO (Se todas as regras passaram)
+            # O usuário é 'sindico' (excluindo um não-sindico) ou 'admin_bloco' (excluindo alguém do seu bloco).
+            
+            print(f"[Ação Admin] Usuário {requesting_user_id} ({requesting_user['role']}) está excluindo usuário {target_user_id}.")
+
+            # Passo 4.1: Excluir registros dependentes primeiro (Ex: Reclamações)
+            # Isso é crucial por causa das Foreign Keys
+            cursor.execute("DELETE FROM Complaints WHERE user_id = %s", (target_user_id,))
+            
+            # Passo 4.2: Excluir o morador
+            cursor.execute("DELETE FROM Moradores WHERE morador_id = %s", (target_user_id,))
+            
+            conn.commit()
+
+        return jsonify({'message': f'Usuário {target_user_id} e seus dados associados foram excluídos com sucesso.'}), 200
+    except psycopg2.Error as e:
+        conn.rollback()
+        return jsonify({'error': f'Erro de banco de dados: {e}'}), 500
+    finally:
+        if conn:
+            conn.close()
+
 @app.route('/api/complaints/<int:complaint_id>', methods=['PUT'])
 def update_complaint(complaint_id):
     """Atualiza o status e/ou comentário de uma reclamação."""

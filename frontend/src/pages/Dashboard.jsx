@@ -215,6 +215,36 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteUser = async (targetUserId, targetUserName) => {
+    // 1. Confirmação dupla (MUITO IMPORTANTE)
+    if (!confirm(`Tem certeza que deseja EXCLUIR PERMANENTEMENTE o usuário ${targetUserName}?\n\nATENÇÃO: Todas as reclamações e dados deste usuário serão apagados. Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    setIsLoading(true);
+    setFormMessage({ type: "", text: "" });
+    try {
+      const response = await fetch(`${API_URL}/api/users/${targetUserId}?user_id=${user.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        alert(data.message || "Usuário excluído com sucesso!");
+        fetchUsers(); // Atualiza a lista de usuários
+      } else {
+        throw new Error(data.error || 'Não foi possível excluir o usuário.');
+      }
+    } catch (error) {
+      console.error("Erro ao excluir usuário:", error);
+      // Mostra o erro na tela de gerenciamento
+      setFormMessage({ type: 'error', text: error.message || "Erro ao conectar com o servidor." });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- RENDERIZAÇÃO CONDICIONAL ---
 
   // *** INÍCIO DO JSX FALTANTE ***
@@ -469,6 +499,15 @@ export default function Dashboard() {
                               title={`Rebaixar ${u.nome} a Morador`}
                             >
                               Rebaixar
+                            </button>
+                          ):(
+                            <button
+                              className="btn btn-sm btn-outline-danger" // Botão mais discreto (outline)
+                              onClick={() => handleDeleteUser(u.id, u.nome)}
+                              disabled={isLoading}
+                              title={`Excluir ${u.nome} permanentemente`}
+                            >
+                            Excluir
                             </button>
                           )}
                         </>
