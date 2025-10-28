@@ -98,8 +98,8 @@ export default function Login() {
         <div className="mt-3 p-2 bg-light rounded">
           <small>
             <p style={{ textAlign: 'center', fontSize: '0.9em', color: '#555' }}>
-                Esse trabalho foi feito pelo <Link to="/integrantes">grupo 21</Link>, 
-                da faculdade <a href="https://univesp.br" target="_blank" rel="noopener noreferrer">Univesp</a>.
+                O presente projeto foi realizado pelos integrantes do <Link to="/integrantes">grupo 21</Link>, 
+                , no âmbito da disciplina de Projeto Integrador II - Eixo da Computação TI , da Universidade Virtual do Estado de São Paulo<a href="https://univesp.br" target="_blank" rel="noopener noreferrer">Univesp</a>.
             </p>
           </small>
         </div>
