@@ -97,7 +97,7 @@ export default function Integrantes() {
           <li style={listItemStyle}>Pablo Santos Barros</li> {/* [cite: 14] */}
         </ul>
 
-        <h3 style={sectionTitleStyle}>Tutor/Mediador</h3> {/* [cite: 15] */}
+        <h3 style={sectionTitleStyle}>Orientadora</h3> {/* [cite: 15] */}
         <p style={{...listItemStyle, fontWeight: 'bold', fontSize: '1.15em' }}>
           Prof.ª Elva Karina Mayhua Quispe
         </p> {/* [cite: 16] */}
