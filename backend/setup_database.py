@@ -21,7 +21,7 @@ def setup_database():
             print("Verificando e criando tabelas (se não existirem)...")
            
             # Criação das tabelas
-            cursor.execute("""
+            cursor.execute(
             CREATE TABLE IF NOT EXISTS Blocos (
                 bloco_id SERIAL PRIMARY KEY,
                 numero_bloco INTEGER NOT NULL UNIQUE
@@ -49,7 +49,7 @@ def setup_database():
                 status TEXT DEFAULT 'aberto',
                 admin_comment TEXT
             );
-            """)
+            )
             print("Tabelas verificadas/criadas com sucesso.")
 
             # --- CORREÇÃO DE INDENTAÇÃO E LÓGICA DE POPULAÇÃO ---
