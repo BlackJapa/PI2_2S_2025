@@ -18,15 +18,19 @@ if not DATABASE_URL:
     raise RuntimeError("A variável de ambiente DATABASE_URL não foi definida.")
 
 def get_db_connection():
-    """Conexão preparada para o Supabase"""
-    # O parâmetro sslmode='require' é fundamental para bancos externos
-    conn = psycopg2.connect(
-        DATABASE_URL, 
-        cursor_factory=RealDictCursor, 
-        sslmode='require'
-    )
-    return conn
+    """Cria e retorna uma conexão com o banco de dados Supabase com SSL."""
+    try:
+        conn = psycopg2.connect(
+            DATABASE_URL, 
+            cursor_factory=RealDictCursor,
+            sslmode='require'  # ADICIONE ISSO: Obrigatório para o Supabase
+        )
+        return conn
+    except Exception as e:
+        print(f"Erro ao conectar ao banco: {e}")
+        raise
 
+    
 @app.route('/api/db-status', methods=['GET'])
 def db_status():
     """Verifica se a conexão com o banco de dados está ativa."""

@@ -1,5 +1,5 @@
 Flask
-gunicorn
-psycopg2-binary
-werkzeug
 Flask-CORS
+psycopg2-binary
+gunicorn
+werkzeug
