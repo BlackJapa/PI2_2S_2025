@@ -18,8 +18,13 @@ if not DATABASE_URL:
     raise RuntimeError("A variável de ambiente DATABASE_URL não foi definida.")
 
 def get_db_connection():
-    """Cria e retorna uma conexão com o banco de dados PostgreSQL."""
-    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    """Conexão preparada para o Supabase"""
+    # O parâmetro sslmode='require' é fundamental para bancos externos
+    conn = psycopg2.connect(
+        DATABASE_URL, 
+        cursor_factory=RealDictCursor, 
+        sslmode='require'
+    )
     return conn
 
 @app.route('/api/register', methods=['POST'])
