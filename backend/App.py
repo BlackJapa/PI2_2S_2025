@@ -27,6 +27,17 @@ def get_db_connection():
     )
     return conn
 
+@app.route('/api/db-status', methods=['GET'])
+def db_status():
+    """Verifica se a conexão com o banco de dados está ativa."""
+    try:
+        conn = get_db_connection()
+        conn.close()
+        return jsonify({'status': 'online'}), 200
+    except Exception as e:
+        return jsonify({'status': 'offline', 'error': str(e)}), 500
+
+
 @app.route('/api/register', methods=['POST'])
 def register():
     """Registra um novo morador no sistema."""

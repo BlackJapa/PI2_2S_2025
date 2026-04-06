@@ -232,3 +232,33 @@ body.high-contrast { /* Aplica diretamente ao body */
   outline: 3px solid #ffff00 !important;
   outline-offset: 2px;
 }
+
+/* Indicador de Status do Banco */
+.db-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+.db-indicator.online {
+  background-color: #28a745; /* Verde */
+  box-shadow: 0 0 8px #28a745;
+}
+
+.db-indicator.offline {
+  background-color: #dc3545; /* Vermelho */
+  box-shadow: 0 0 8px #dc3545;
+}
+
+.db-indicator.checking {
+  background-color: #ffc107; /* Amarelo */
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
