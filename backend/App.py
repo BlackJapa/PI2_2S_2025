@@ -107,46 +107,62 @@ def get_blocks():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """Autentica um usuário e retorna seus dados se as credenciais forem válidas."""
+    """Autentica o usuário e retorna seus dados."""
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-    conn = get_db_connection()
+    # Pegamos bloco e ap do JSON enviado pelo frontend
+    bloco_input = data.get('bloco')
+    apartamento_input = data.get('apartamento')
+
+    conn = None
     try:
-        with conn.cursor() as cursor:
-            cursor.execute('SELECT * FROM Moradores WHERE email = %s', (email,))
-            morador = cursor.fetchone()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Buscamos o usuário apenas pelo e-mail primeiro para garantir a segurança
+        cursor.execute("""
+            SELECT m.*, a.numero_apartamento, b.numero_bloco 
+            FROM Moradores m
+            JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
+            JOIN Blocos b ON a.bloco_id = b.bloco_id
+            WHERE m.email = %s
+        """, (email,))
+        
+        user = cursor.fetchone()
 
-            if morador and check_password_hash(morador['password'], password):
-                cursor.execute('''
-                    SELECT m.*, a.numero_apartamento, b.numero_bloco 
-                    FROM Moradores m
-                    JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
-                    JOIN Blocos b ON a.bloco_id = b.bloco_id
-                    WHERE m.email = %s 
-                    AND b.numero_bloco = %s 
-                    AND a.numero_apartamento = %s
-                ''', (morador['apartamento_id'],))
-                ap_info = cursor.fetchone()
+        if user and check_password_hash(user['password'], password):
+            # COMPARAÇÃO DE SEGURANÇA:
+            # Convertemos os valores do banco e do input para String para evitar erro de tipo
+            db_bloco = str(user['numero_bloco'])
+            db_ap = str(user['numero_apartamento'])
+            
+            input_bloco = str(bloco_input) if bloco_input is not None else ""
+            input_ap = str(apartamento_input) if apartamento_input is not None else ""
 
+            # Se for Síndico Geral (Role sindico), ele pula a verificação de bloco/ap
+            # Caso contrário, verifica se o bloco/ap digitado é o mesmo do cadastro
+            if user['role'] == 'sindico' or (db_bloco == input_bloco and db_ap == input_ap):
                 return jsonify({
-                    'id': morador['morador_id'],
-                    'nome': morador['nome'],
-                    'email': morador['email'],
-                    'is_admin': morador['role'] in ('sindico', 'admin_bloco'),
-                    'role': morador['role'],
-                    'bloco_id': ap_info['bloco_id'] if ap_info else None,
-                    'bloco': ap_info['numero_bloco'] if ap_info else 'N/A',
-                    'apartment': ap_info['numero_apartamento'] if ap_info else 'N/A'
+                    'id': user['morador_id'],
+                    'nome': user['nome'],
+                    'role': user['role'],
+                    'bloco': user['numero_bloco'],
+                    'apartment': user['numero_apartamento']
                 }), 200
             else:
-                return jsonify({'error': 'E-mail ou senha inválidos'}), 401
-    except psycopg2.Error as e:
-        return jsonify({'error': f'Erro de banco de dados: {e}'}), 500
+                return jsonify({'error': 'Bloco ou Apartamento não conferem com este e-mail.'}), 401
+
+        return jsonify({'error': 'E-mail ou senha incorretos.'}), 401
+
+    except Exception as e:
+        print(f"Erro no login: {e}")
+        return jsonify({'error': 'Erro interno no servidor.'}), 500
     finally:
         if conn:
             conn.close()
 
+            
 @app.route('/api/users', methods=['GET'])
 def get_users():
     """Busca e retorna uma lista de usuários com base nas permissões e filtro de bloco."""

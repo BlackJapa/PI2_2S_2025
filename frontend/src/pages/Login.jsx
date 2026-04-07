@@ -23,13 +23,17 @@ export default function Login() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    const response = await fetch(`${API_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // CERTIFIQUE-SE DE ENVIAR OS 4 CAMPOS:
+      body: JSON.stringify({ 
+        email, 
+        password, 
+        bloco, 
+        apartamento 
+      }),
+    });
 
       const data = await response.json();
 
