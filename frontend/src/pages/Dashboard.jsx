@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 const cursorPointerStyle = { cursor: 'pointer' };
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+
 export default function Dashboard() {
   const location = useLocation();
   const user = location.state || { nome: "Visitante", id: null, role: 'morador', is_admin: false, bloco: 'N/A', apartment: 'N/A', bloco_id: null };

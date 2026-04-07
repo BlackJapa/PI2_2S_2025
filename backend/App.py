@@ -12,7 +12,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "https://condominio-app-npf9.onrender.com"}})
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise RuntimeError("A variável de ambiente DATABASE_URL não foi definida.")
@@ -30,7 +30,7 @@ def get_db_connection():
         print(f"Erro ao conectar ao banco: {e}")
         raise
 
-    
+
 @app.route('/api/db-status', methods=['GET'])
 def db_status():
     """Verifica se a conexão com o banco de dados está ativa."""
@@ -119,10 +119,13 @@ def login():
 
             if morador and check_password_hash(morador['password'], password):
                 cursor.execute('''
-                    SELECT b.numero_bloco, b.bloco_id, a.numero_apartamento
-                    FROM Apartamentos a
+                    SELECT m.*, a.numero_apartamento, b.numero_bloco 
+                    FROM Moradores m
+                    JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
                     JOIN Blocos b ON a.bloco_id = b.bloco_id
-                    WHERE a.apartamento_id = %s
+                    WHERE m.email = %s 
+                    AND b.numero_bloco = %s 
+                    AND a.numero_apartamento = %s
                 ''', (morador['apartamento_id'],))
                 ap_info = cursor.fetchone()
 
