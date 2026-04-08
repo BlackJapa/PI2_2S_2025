@@ -12,7 +12,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "https://condominio-app-npf9.onrender.com"}})
+CORS(app)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise RuntimeError("A variável de ambiente DATABASE_URL não foi definida.")
