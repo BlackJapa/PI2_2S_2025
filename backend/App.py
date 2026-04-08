@@ -9,50 +9,75 @@ import datetime
 from functools import wraps
 
 app = Flask(__name__)
-# Permitir CORS para todas as origens durante o teste, ou configure sua URL do Render
-CORS(app)
+CORS(app) # Permite todas as origens para eliminar erro de CORS
 
-# Variáveis de Ambiente
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'pi_condominio_2026_segredo')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'chave_mestra_condominio')
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
-    return psycopg2.connect(
-        DATABASE_URL,
-        cursor_factory=RealDictCursor,
-        sslmode='require'
-    )
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode='require')
 
-# --- Middleware de Autenticação ---
+# --- Middleware ---
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization')
         if not auth_header or " " not in auth_header:
-            return jsonify({'error': 'Token ausente ou malformado'}), 401
-
+            return jsonify({'error': 'Token ausente'}), 401
         try:
             token = auth_header.split(" ")[1]
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             g.user_id = data['user_id']
-            g.role = data['role']
-        except Exception:
-            return jsonify({'error': 'Token inválido ou expirado'}), 401
-
+        except:
+            return jsonify({'error': 'Token inválido'}), 401
         return f(*args, **kwargs)
     return decorated
 
-# --- Rotas ---
+# --- Rota de Cadastro ---
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    nome = data.get('nome')
+    email = data.get('email')
+    password = generate_password_hash(data.get('password'))
+    bloco = str(data.get('bloco'))
+    ap = str(data.get('apartamento'))
 
-@app.route('/api/db-status', methods=['GET'])
-def db_status():
+    conn = None
     try:
         conn = get_db_connection()
-        conn.close()
-        return jsonify({'status': 'online'}), 200
-    except:
-        return jsonify({'status': 'offline'}), 500
+        cursor = conn.cursor()
 
+        # 1. Encontrar o ID do apartamento correto baseado no bloco e número
+        cursor.execute("""
+            SELECT a.apartamento_id FROM Apartamentos a
+            JOIN Blocos b ON a.bloco_id = b.bloco_id
+            WHERE b.numero_bloco = %s AND a.numero_apartamento = %s
+        """, (bloco, ap))
+        
+        result = cursor.fetchone()
+        if not result:
+            return jsonify({'error': f'Bloco {bloco} ou Apartamento {ap} não cadastrados no sistema.'}), 400
+        
+        ap_id = result['apartamento_id']
+
+        # 2. Inserir o novo morador
+        cursor.execute("""
+            INSERT INTO Moradores (nome, email, password, role, apartamento_id)
+            VALUES (%s, %s, %s, 'morador', %s)
+        """, (nome, email, password, ap_id))
+        
+        conn.commit()
+        return jsonify({'message': 'Usuário cadastrado com sucesso!'}), 201
+
+    except psycopg2.IntegrityError:
+        return jsonify({'error': 'Este e-mail já está cadastrado.'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Erro no servidor: {str(e)}'}), 500
+    finally:
+        if conn: conn.close()
+
+# --- Rota de Login ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -90,22 +115,8 @@ def login():
                 }
             }), 200
         
-        return jsonify({'error': 'E-mail ou senha incorretos'}), 401
+        return jsonify({'error': 'Credenciais inválidas'}), 401
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         if conn: conn.close()
-
-# Exemplo de rota protegida para buscar reclamações
-@app.route('/api/my-complaints', methods=['GET'])
-@token_required
-def get_my_complaints():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM Complaints WHERE user_id = %s", (g.user_id,))
-    complaints = cursor.fetchall()
-    conn.close()
-    return jsonify(complaints), 200
-
-if __name__ == '__main__':
-    app.run()
