@@ -27,10 +27,10 @@ export default function Login() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        email, 
-       password, 
-       bloco, 
-       apartamento // Certifique-se de que o estado se chama 'apartamento'
+        email: email,
+        password: password,
+        bloco: bloco,
+        apartamento: apartamento // Certifique-se de que o estado se chama 'apartamento'
       }),
     });
 
