@@ -26,12 +26,11 @@ export default function Login() {
     const response = await fetch(`${API_URL}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // CERTIFIQUE-SE DE ENVIAR OS 4 CAMPOS:
       body: JSON.stringify({ 
         email, 
-        password, 
-        bloco, 
-        apartamento 
+       password, 
+       bloco, 
+       apartamento // Certifique-se de que o estado se chama 'apartamento'
       }),
     });
 

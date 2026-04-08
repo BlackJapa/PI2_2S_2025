@@ -107,20 +107,19 @@ def get_blocks():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """Autentica o usuário e retorna seus dados."""
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
-    # Pegamos bloco e ap do JSON enviado pelo frontend
-    bloco_input = data.get('bloco')
-    apartamento_input = data.get('apartamento')
+    # Forçamos a conversão para string para garantir a comparação com o banco
+    bloco_input = str(data.get('bloco', ''))
+    ap_input = str(data.get('apartamento', ''))
 
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Buscamos o usuário apenas pelo e-mail primeiro para garantir a segurança
+        # Buscamos o morador trazendo os dados de bloco e ap via JOIN
         cursor.execute("""
             SELECT m.*, a.numero_apartamento, b.numero_bloco 
             FROM Moradores m
@@ -132,37 +131,30 @@ def login():
         user = cursor.fetchone()
 
         if user and check_password_hash(user['password'], password):
-            # COMPARAÇÃO DE SEGURANÇA:
-            # Convertemos os valores do banco e do input para String para evitar erro de tipo
+            # Comparamos bloco e ap como strings
             db_bloco = str(user['numero_bloco'])
             db_ap = str(user['numero_apartamento'])
             
-            input_bloco = str(bloco_input) if bloco_input is not None else ""
-            input_ap = str(apartamento_input) if apartamento_input is not None else ""
-
-            # Se for Síndico Geral (Role sindico), ele pula a verificação de bloco/ap
-            # Caso contrário, verifica se o bloco/ap digitado é o mesmo do cadastro
-            if user['role'] == 'sindico' or (db_bloco == input_bloco and db_ap == input_ap):
+            # Síndico tem passe livre; moradores precisam conferir bloco/ap
+            if user['role'] == 'sindico' or (db_bloco == bloco_input and db_ap == ap_input):
                 return jsonify({
                     'id': user['morador_id'],
                     'nome': user['nome'],
                     'role': user['role'],
-                    'bloco': user['numero_bloco'],
-                    'apartment': user['numero_apartamento']
+                    'bloco': db_bloco,
+                    'apartment': db_ap
                 }), 200
             else:
-                return jsonify({'error': 'Bloco ou Apartamento não conferem com este e-mail.'}), 401
+                return jsonify({'error': 'Bloco ou Apartamento não conferem.'}), 401
 
         return jsonify({'error': 'E-mail ou senha incorretos.'}), 401
-
     except Exception as e:
-        print(f"Erro no login: {e}")
+        print(f"Erro no processamento: {e}")
         return jsonify({'error': 'Erro interno no servidor.'}), 500
     finally:
-        if conn:
-            conn.close()
+        if conn: conn.close()
 
-            
+
 @app.route('/api/users', methods=['GET'])
 def get_users():
     """Busca e retorna uma lista de usuários com base nas permissões e filtro de bloco."""
