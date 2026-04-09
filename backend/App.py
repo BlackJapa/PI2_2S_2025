@@ -77,6 +77,10 @@ def register():
     finally:
         if conn: conn.close()
 
+@app.route('/api/db-status', methods=['GET'])
+def db_status():
+    return jsonify({'status': 'online'}), 200
+
 # --- Rota de Login ---
 @app.route('/api/login', methods=['POST'])
 def login():

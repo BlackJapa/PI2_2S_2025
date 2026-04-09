@@ -12,11 +12,24 @@ export default function Login() {
     e.preventDefault();
 
     try {
+<<<<<<< HEAD
       const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+=======
+    const response = await fetch(`${API_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        email, 
+       password, 
+       bloco, 
+       apartamento // Certifique-se de que o estado se chama 'apartamento'
+      }),
+    });
+>>>>>>> parent of b8938ac (Update Login.jsx)
 
       const data = await response.json();
 
