@@ -3,3 +3,4 @@ Flask-CORS
 psycopg2-binary
 gunicorn
 werkzeug
+PyJWT==2.8.0
