@@ -101,6 +101,31 @@ export default function Dashboard() {
     navigate("/");
   };
 
+  const handleChangeRole = async (userId, userName, newRole) => {
+    if (!window.confirm(`Tem certeza que deseja alterar a permissão de ${userName} para ${newRole}?`)) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(`${API_URL}/api/users/${userId}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (response.ok) {
+        alert(`Permissão de ${userName} alterada com sucesso!`);
+        fetchUsers(); // Recarrega a lista de usuários para atualizar a tela
+      } else {
+        const data = await response.json();
+        alert(data.error || "Erro ao alterar permissão.");
+      }
+    } catch (error) {
+      alert("Erro ao conectar com o servidor.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // --- RENDERIZAÇÃO DO MENU PRINCIPAL ---
   if (view === "menu") {
     return (

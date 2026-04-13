@@ -147,3 +147,30 @@ def manage_complaints():
         return jsonify({'error': 'Erro interno do servidor'}), 500
     finally:
         if conn: conn.close()
+
+@app.route('/api/users/<int:user_id>/role', methods=['PUT'])
+def change_user_role(user_id):
+    """Rota para o Síndico Geral alterar o nível de acesso de outros usuários."""
+    data = request.get_json()
+    new_role = data.get('role') # Pode ser 'morador', 'admin_bloco' ou 'sindico'
+    
+    # Validação básica de segurança
+    if new_role not in ['morador', 'admin_bloco', 'sindico']:
+        return jsonify({'error': 'Cargo inválido'}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Atualiza o cargo do usuário no banco
+        cursor.execute("UPDATE Moradores SET role = %s WHERE morador_id = %s", (new_role, user_id))
+        conn.commit()
+        
+        return jsonify({'message': f'Permissão atualizada para {new_role} com sucesso!'}), 200
+
+    except Exception as e:
+        print(f"Erro ao alterar permissão: {e}")
+        return jsonify({'error': 'Erro interno ao atualizar permissão'}), 500
+    finally:
+        if conn: conn.close()
