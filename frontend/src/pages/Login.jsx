@@ -21,11 +21,11 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok) {
-        // Guardamos o token e os dados para uso global
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        
-        navigate("/dashboard");
+        // Agora 'data' já é o objeto do usuário direto
+        localStorage.setItem("user", JSON.stringify(data));
+
+        // Redireciona passando os dados no estado da rota
+        navigate("/dashboard", { state: data });
       } else {
         alert(data.error || "Erro ao fazer login");
       }
