@@ -75,29 +75,75 @@ def login():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Busca o usuário com os dados de bloco e apartamento
-        cursor.execute("""
-            SELECT m.*, a.numero_apartamento, b.numero_bloco 
-            FROM Moradores m
-            JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
-            JOIN Blocos b ON a.bloco_id = b.bloco_id
-            WHERE m.email = %s
-        """, (email,))
-        
+        # 1. Busca os dados básicos do usuário
+        cursor.execute("SELECT * FROM Moradores WHERE email = %s", (email,))
         user = cursor.fetchone()
 
         if user and check_password_hash(user['password'], password):
-            # Retornamos os dados do usuário DIRETAMENTE, sem token
+            # 2. Busca TODOS os apartamentos vinculados a ele
+            cursor.execute("""
+                SELECT a.numero_apartamento, b.numero_bloco 
+                FROM Morador_Apartamentos ma
+                JOIN Apartamentos a ON ma.apartamento_id = a.apartamento_id
+                JOIN Blocos b ON a.bloco_id = b.bloco_id
+                WHERE ma.morador_id = %s
+            """, (user['morador_id'],))
+            
+            apartamentos = cursor.fetchall()
+            
+            # Se for síndico, a lista de apartamentos pode ser ignorada no painel, 
+            # mas enviamos mesmo assim.
+            
             return jsonify({
                 'id': user['morador_id'],
                 'nome': user['nome'],
                 'role': user['role'],
-                'bloco': user['numero_bloco'],
-                'apartment': user['numero_apartamento']
+                'apartamentos': apartamentos # <-- Agora enviamos uma LISTA
             }), 200
         
         return jsonify({'error': 'E-mail ou senha incorretos'}), 401
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/complaints', methods=['GET', 'POST'])
+def manage_complaints():
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # SE FOR PARA CRIAR UMA RECLAMAÇÃO (POST)
+        if request.method == 'POST':
+            data = request.get_json()
+            user_id = data.get('user_id')
+            subject = data.get('subject')
+            description = data.get('description')
+            
+            cursor.execute("""
+                INSERT INTO Complaints (user_id, subject, description, status) 
+                VALUES (%s, %s, %s, 'Pendente')
+            """, (user_id, subject, description))
+            conn.commit()
+            return jsonify({'message': 'Reclamação registrada com sucesso!'}), 201
+
+        # SE FOR PARA LISTAR RECLAMAÇÕES (GET)
+        elif request.method == 'GET':
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+            
+            # Síndico e Admin veem todas, Morador vê apenas as dele
+            if role in ['sindico', 'admin_bloco']:
+                cursor.execute("SELECT * FROM Complaints ORDER BY id DESC")
+            else:
+                cursor.execute("SELECT * FROM Complaints WHERE user_id = %s ORDER BY id DESC", (user_id,))
+            
+            complaints = cursor.fetchall()
+            return jsonify(complaints), 200
+
+    except Exception as e:
+        print(f"Erro nas reclamações: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
     finally:
         if conn: conn.close()

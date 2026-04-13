@@ -16,6 +16,8 @@ export default function Dashboard() {
   };
 
   const [user, setUser] = useState(getInitialUser());
+// Pega o primeiro apartamento da lista como padrão
+  const [activeApt, setActiveApt] = useState(user?.apartamentos?.[0] || null);
   const [view, setView] = useState("menu");
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
@@ -109,9 +111,30 @@ export default function Dashboard() {
         </div>
         
         <div className="card p-3 mb-4 bg-light">
-          <p className="mb-1"><strong>Bloco:</strong> {user?.bloco} | <strong>Apartamento:</strong> {user?.apartment}</p>
-          <p className="mb-0"><strong>Perfil:</strong> {user?.role === 'sindico' ? 'Síndico Geral' : user?.role === 'admin_bloco' ? 'Admin de Bloco' : 'Morador'}</p>
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <p className="mb-0"><strong>Perfil:</strong> {user?.role}</p>
         </div>
+
+        {/* Se o usuário tiver mais de 1 apartamento, exibe o seletor */}
+        {user?.apartamentos?.length > 0 && (
+          <div>
+            <label className="me-2 fw-bold">Apartamento Atual:</label>
+            <select 
+              className="form-select form-select-sm d-inline-block w-auto"
+              value={JSON.stringify(activeApt)}
+              onChange={(e) => setActiveApt(JSON.parse(e.target.value))}
+            >
+              {user.apartamentos.map((apt, index) => (
+                <option key={index} value={JSON.stringify(apt)}>
+                  Bloco {apt.numero_bloco} - Ap {apt.numero_apartamento}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
 
         <div className="row g-3">
           <div className="col-md-6">
