@@ -163,28 +163,53 @@ def manage_complaints():
 
 @app.route('/api/users/<int:user_id>/role', methods=['PUT'])
 def change_user_role(user_id):
-    """Rota para o Síndico Geral alterar o nível de acesso de outros usuários."""
     data = request.get_json()
-    new_role = data.get('role') # Pode ser 'morador', 'admin_bloco' ou 'sindico'
-    
-    # Validação básica de segurança
-    if new_role not in ['morador', 'admin_bloco', 'sindico']:
-        return jsonify({'error': 'Cargo inválido'}), 400
+    new_role = data.get('role') # 'morador' ou 'admin_bloco'
 
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Atualiza o cargo do usuário no banco
+
+        # SE A INTENÇÃO FOR PROMOVER A ADMIN DE BLOCO
+        if new_role == 'admin_bloco':
+            # 1. Descobrir qual o bloco do morador que será promovido
+            cursor.execute("""
+                SELECT a.bloco_id, b.numero_bloco 
+                FROM Moradores m
+                JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
+                JOIN Blocos b ON a.bloco_id = b.bloco_id
+                WHERE m.morador_id = %s
+            """, (user_id,))
+            result = cursor.fetchone()
+            
+            if not result:
+                return jsonify({'error': 'Morador não encontrado ou sem apartamento associado'}), 404
+            
+            bloco_id = result['bloco_id']
+            num_bloco = result['numero_bloco']
+
+            # 2. Verificar se JÁ EXISTE outro admin nesse mesmo bloco
+            cursor.execute("""
+                SELECT m.nome FROM Moradores m
+                JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
+                WHERE a.bloco_id = %s AND m.role = 'admin_bloco' AND m.morador_id != %s
+            """, (bloco_id, user_id))
+            
+            existing_admin = cursor.fetchone()
+            if existing_admin:
+                return jsonify({
+                    'error': f'O Bloco {num_bloco} já possui um síndico: {existing_admin["nome"]}.'
+                }), 400
+
+        # 3. Se passou na verificação (ou se for para rebaixar a morador), faz o update
         cursor.execute("UPDATE Moradores SET role = %s WHERE morador_id = %s", (new_role, user_id))
         conn.commit()
         
-        return jsonify({'message': f'Permissão atualizada para {new_role} com sucesso!'}), 200
+        return jsonify({'message': 'Cargo atualizado com sucesso!'}), 200
 
     except Exception as e:
-        print(f"Erro ao alterar permissão: {e}")
-        return jsonify({'error': 'Erro interno ao atualizar permissão'}), 500
+        return jsonify({'error': str(e)}), 500
     finally:
         if conn: conn.close()
 

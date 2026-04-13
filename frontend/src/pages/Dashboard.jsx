@@ -41,6 +41,7 @@ export default function Dashboard() {
     }
   }, [user, navigate]);
 
+
   // --- BUSCA DE RECLAMAÇÕES (Com Filtro de Role) ---
   const fetchComplaints = useCallback(async () => {
     if (!user?.id) return;
@@ -235,7 +236,31 @@ export default function Dashboard() {
     const filteredUsers = selectedBlock 
       ? users.filter(u => String(u.numero_bloco) === selectedBlock)
       : users;
+    const handleToggleAdmin = async (targetUser) => {
+      const isPromoting = targetUser.role === 'morador';
+      const actionText = isPromoting ? "promover a Síndico de Bloco" : "rebaixar a Morador";
+  
+      if (!window.confirm(`Tem certeza que deseja ${actionText} o(a) ${targetUser.nome}?`)) return;
 
+      try {
+        const res = await fetch(`${API_URL}/api/users/${targetUser.morador_id}/role`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: isPromoting ? 'admin_bloco' : 'morador' }),
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          alert("Operação realizada com sucesso!");
+          fetchUsers(); // Recarrega a lista
+        } else {
+          alert(data.error); // Exibe o erro de "já existe um síndico" vindo do backend
+        }
+      } catch (error) {
+      alert("Erro de conexão.");
+      }
+    };
     return (
       <div className="container mt-4">
         <BackButton />
@@ -251,35 +276,48 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="table-responsive card shadow-sm">
-          <table className="table table-hover mb-0">
-            <thead className="table-dark">
-              <tr>
-                <th>Nome</th>
-                <th>E-mail</th>
-                <th>Bloco</th>
-                <th>Apto</th>
-                <th>Cargo</th>
+      <div className="table-responsive card shadow-sm">
+        <table className="table table-hover mb-0">
+          <thead className="table-dark">
+            <tr>
+              <th>Nome</th>
+              <th>Bloco</th>
+              <th>Apto</th>
+              <th>Cargo</th>
+              {user.role === 'sindico' && <th>Ações</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filteredUsers.map(u => (
+              <tr key={u.morador_id}>
+                <td>{u.nome}</td>
+                <td>{u.numero_bloco}</td>
+                <td>{u.numero_apartamento}</td>
+                <td>
+                  <span className={`badge ${u.role === 'morador' ? 'bg-secondary' : 'bg-primary'}`}>
+                    {u.role === 'admin_bloco' ? 'Síndico de Bloco' : u.role}
+                  </span>
+                </td>
+                {user.role === 'sindico' && (
+                  <td>
+                    <button 
+                      className={`btn btn-sm ${u.role === 'morador' ? 'btn-outline-primary' : 'btn-outline-danger'}`}
+                      onClick={() => handleToggleAdmin(u)}
+                    >
+                      {u.role === 'morador' ? 'Promover' : 'Rebaixar'}
+                    </button>
+                  </td>
+                )}
               </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map(u => (
-                <tr key={u.morador_id}>
-                  <td>{u.nome}</td>
-                  <td>{u.email}</td>
-                  <td>{u.numero_bloco}</td>
-                  <td>{u.numero_apartamento}</td>
-                  <td><span className="badge bg-secondary">{u.role}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
-  // --- VIEW: LISTA / ADMINISTRAÇÃO DE RECLAMAÇÕES ---
+// --- VIEW: LISTA / ADMINISTRAÇÃO DE RECLAMAÇÕES ---
   if (view === "list" || view === "admin") {
     return (
       <div className="container mt-4">
