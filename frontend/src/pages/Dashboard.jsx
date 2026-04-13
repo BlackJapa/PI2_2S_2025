@@ -6,9 +6,8 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // --- CORREÇÃO PARTE 3: BUSCA DE DADOS DO USUÁRIO ---
-  // Tentamos pegar do localStorage para evitar que os dados sumam no F5
+
+  // --- BUSCA DE DADOS DO USUÁRIO E PERSISTÊNCIA ---
   const getInitialUser = () => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) return JSON.parse(savedUser);
@@ -16,20 +15,23 @@ export default function Dashboard() {
   };
 
   const [user, setUser] = useState(getInitialUser());
-// Pega o primeiro apartamento da lista como padrão
   const [activeApt, setActiveApt] = useState(user?.apartamentos?.[0] || null);
   const [view, setView] = useState("menu");
+  
+  // Estados de Listas
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
-  
-  // Estados para formulários e modais
+  const [selectedBlock, setSelectedBlock] = useState(""); // Filtro para o Master
+
+  // Estados para Reclamações
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Estados para Gestão Administrativa
   const [showModal, setShowModal] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [newStatus, setNewStatus] = useState("");
-  const [newAdminComment, setNewAdminComment] = useState("");
   const [adminComment, setAdminComment] = useState("");
 
   // Redireciona se não houver usuário logado
@@ -39,11 +41,10 @@ export default function Dashboard() {
     }
   }, [user, navigate]);
 
-  // --- BUSCA DE RECLAMAÇÕES (Sem Token) ---
+  // --- BUSCA DE RECLAMAÇÕES (Com Filtro de Role) ---
   const fetchComplaints = useCallback(async () => {
     if (!user?.id) return;
     try {
-      // Passamos o user_id e role via Query String para o backend filtrar
       const res = await fetch(`${API_URL}/api/complaints?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
       if (res.ok) setComplaints(data);
@@ -52,11 +53,11 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // --- BUSCA DE USUÁRIOS (Apenas para Admins) ---
+  // --- BUSCA DE USUÁRIOS (Hierárquica) ---
   const fetchUsers = useCallback(async () => {
     if (user?.role !== 'sindico' && user?.role !== 'admin_bloco') return;
     try {
-      const res = await fetch(`${API_URL}/api/users`);
+      const res = await fetch(`${API_URL}/api/users?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
       if (res.ok) setUsers(data);
     } catch (error) {
@@ -65,11 +66,35 @@ export default function Dashboard() {
   }, [user]);
 
   useEffect(() => {
-    if (view === "list" || view === "stats") fetchComplaints();
-    if (view === "admin") fetchUsers();
+    if (view === "list" || view === "stats" || view === "admin") fetchComplaints();
+    if (view === "users") fetchUsers();
   }, [view, fetchComplaints, fetchUsers]);
 
-  // --- CRIAR RECLAMAÇÃO ---
+  // --- GESTÃO DE RECLAMAÇÕES (Update Status/Ações) ---
+  const handleUpdateComplaint = async () => {
+    if (!selectedComplaint) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/api/complaints/${selectedComplaint.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          status: newStatus, 
+          admin_comment: adminComment 
+        }),
+      });
+      if (res.ok) {
+        alert("Reclamação atualizada com sucesso!");
+        setShowModal(false);
+        fetchComplaints();
+      }
+    } catch (error) {
+      alert("Erro ao atualizar.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCreateComplaint = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -84,7 +109,7 @@ export default function Dashboard() {
         }),
       });
       if (res.ok) {
-        alert("Reclamação enviada!");
+        alert("Reclamação registada!");
         setSubject("");
         setDescription("");
         setView("menu");
@@ -96,66 +121,18 @@ export default function Dashboard() {
     }
   };
 
-  // --- LOGOUT ---
   const handleLogout = () => {
     localStorage.removeItem("user");
     navigate("/");
   };
 
-  const handleChangeRole = async (userId, userName, newRole) => {
-    if (!window.confirm(`Tem certeza que deseja alterar a permissão de ${userName} para ${newRole}?`)) return;
+  const BackButton = () => (
+    <button className="btn btn-outline-secondary mb-3" onClick={() => { setView("menu"); setSelectedBlock(""); }}>
+      ← Voltar
+    </button>
+  );
 
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(`${API_URL}/api/users/${userId}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole })
-      });
-
-      if (response.ok) {
-        alert(`Permissão de ${userName} alterada com sucesso!`);
-        fetchUsers(); // Recarrega a lista de usuários para atualizar a tela
-      } else {
-        const data = await response.json();
-        alert(data.error || "Erro ao alterar permissão.");
-      }
-    } catch (error) {
-      alert("Erro ao conectar com o servidor.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Função para salvar alteração de status e ação tomada
-const handleUpdateComplaint = async () => {
-  try {
-    const res = await fetch(`${API_URL}/api/complaints/${selectedComplaint.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        status: newStatus, 
-        admin_comment: adminComment 
-      }),
-    });
-    if (res.ok) {
-      alert("Reclamação atualizada!");
-      setShowModal(false);
-      fetchComplaints();
-    }
-  } catch (error) {
-    alert("Erro ao atualizar.");
-  }
-};
-
-// --- Botão de Voltar (Padrão para todas as sub-telas) ---
-const BackButton = () => (
-  <button className="btn btn-outline-secondary mb-3" onClick={() => setView("menu")}>
-    ← Voltar ao Menu
-  </button>
-);
-
-  // --- RENDERIZAÇÃO DO MENU PRINCIPAL ---
+  // --- VIEW: MENU PRINCIPAL ---
   if (view === "menu") {
     return (
       <div className="container mt-4">
@@ -164,31 +141,29 @@ const BackButton = () => (
           <button className="btn btn-outline-danger" onClick={handleLogout}>Sair</button>
         </div>
         
-        <div className="card p-3 mb-4 bg-light">
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <p className="mb-0"><strong>Perfil:</strong> {user?.role}</p>
-        </div>
-
-        {/* Se o usuário tiver mais de 1 apartamento, exibe o seletor */}
-        {user?.apartamentos?.length > 0 && (
-          <div>
-            <label className="me-2 fw-bold">Apartamento Atual:</label>
-            <select 
-              className="form-select form-select-sm d-inline-block w-auto"
-              value={JSON.stringify(activeApt)}
-              onChange={(e) => setActiveApt(JSON.parse(e.target.value))}
-            >
-              {user.apartamentos.map((apt, index) => (
-                <option key={index} value={JSON.stringify(apt)}>
-                  Bloco {apt.numero_bloco} - Ap {apt.numero_apartamento}
-                </option>
-              ))}
-            </select>
+        <div className="card p-3 mb-4 bg-light shadow-sm">
+          <div className="row align-items-center">
+            <div className="col-md-6">
+              <p className="mb-1"><strong>Perfil:</strong> {user?.role === 'sindico' ? 'Síndico Geral' : user?.role === 'admin_bloco' ? 'Admin de Bloco' : 'Morador'}</p>
+            </div>
+            {user?.apartamentos?.length > 1 && (
+              <div className="col-md-6 text-md-end">
+                <label className="me-2 fw-bold">Apartamento Ativo:</label>
+                <select 
+                  className="form-select form-select-sm d-inline-block w-auto"
+                  value={JSON.stringify(activeApt)}
+                  onChange={(e) => setActiveApt(JSON.parse(e.target.value))}
+                >
+                  {user.apartamentos.map((apt, idx) => (
+                    <option key={idx} value={JSON.stringify(apt)}>
+                      Bloco {apt.numero_bloco} - Ap {apt.numero_apartamento}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
 
         <div className="row g-3">
           <div className="col-md-6">
@@ -197,12 +172,16 @@ const BackButton = () => (
           <div className="col-md-6">
             <button className="btn btn-secondary w-100 py-3" onClick={() => setView("list")}> Minhas Reclamações </button>
           </div>
+          
           {(user?.role === 'sindico' || user?.role === 'admin_bloco') && (
             <>
               <div className="col-md-6">
-                <button className="btn btn-dark w-100 py-3" onClick={() => setView("admin")}> Gerenciar Condomínio </button>
+                <button className="btn btn-dark w-100 py-3" onClick={() => setView("users")}> Gerenciar Moradores </button>
               </div>
               <div className="col-md-6">
+                <button className="btn btn-dark w-100 py-3" onClick={() => setView("admin")}> Gerenciar Reclamações </button>
+              </div>
+              <div className="col-md-12">
                 <button className="btn btn-info w-100 py-3" onClick={() => setView("stats")}> Estatísticas </button>
               </div>
             </>
@@ -212,55 +191,103 @@ const BackButton = () => (
     );
   }
 
-  // --- RENDERIZAÇÃO DE NOVA RECLAMAÇÃO ---
+  // --- VIEW: NOVA RECLAMAÇÃO (Com Dropdown de Assunto) ---
   if (view === "new") {
     return (
       <div className="container mt-4">
+        <BackButton />
         <h3>Nova Reclamação</h3>
-        <form onSubmit={handleCreateComplaint}>
+        <form onSubmit={handleCreateComplaint} className="card p-4 shadow-sm">
+          <label className="fw-bold mb-1">Assunto:</label>
           <select 
             className="form-select mb-3" 
             value={subject} 
             onChange={(e) => setSubject(e.target.value)} 
             required
           >
-            <option value="">Selecione o Assunto</option>
+            <option value="">Selecione um motivo...</option>
             <option value="Cobrança">Cobrança</option>
             <option value="Barulho">Barulho</option>
             <option value="Limpeza">Limpeza</option>
             <option value="Encomendas">Encomendas</option>
             <option value="Serviços">Serviços</option>
           </select>
+
+          <label className="fw-bold mb-1">Descrição:</label>
           <textarea 
             className="form-control mb-3" 
-            placeholder="Descrição detalhada" 
+            placeholder="Detalhe o ocorrido..." 
             rows="4" 
             value={description} 
             onChange={(e) => setDescription(e.target.value)} 
             required 
           />
-          <div className="d-flex gap-2">
-            <button type="submit" className="btn btn-success" disabled={isSubmitting}>
-              {isSubmitting ? "Enviando..." : "Enviar"}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setView("menu")}>Voltar</button>
-          </div>
+          <button type="submit" className="btn btn-success w-100" disabled={isSubmitting}>
+            {isSubmitting ? "A enviar..." : "Registrar Reclamação"}
+          </button>
         </form>
       </div>
     );
   }
 
-  // --- RENDERIZAÇÃO DA LISTA DE RECLAMAÇÕES ---
-  if (view === "list") {
+  // --- VIEW: GERENCIAR MORADORES ---
+  if (view === "users") {
+    const filteredUsers = selectedBlock 
+      ? users.filter(u => String(u.numero_bloco) === selectedBlock)
+      : users;
+
     return (
       <div className="container mt-4">
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <h3>{user.role === 'morador' ? 'Minhas Reclamações' : 'Gerenciar Reclamações'}</h3>
-          <button className="btn btn-secondary" onClick={() => setView("menu")}>Voltar</button>
+        <BackButton />
+        <h3>Moradores</h3>
+        
+        {user.role === 'sindico' && (
+          <div className="card p-3 mb-3 bg-light">
+            <label className="fw-bold mb-1">Filtrar por Bloco:</label>
+            <select className="form-select" value={selectedBlock} onChange={(e) => setSelectedBlock(e.target.value)}>
+              <option value="">Todos os Blocos</option>
+              {[...Array(41).keys()].map(i => <option key={i} value={i}>Bloco {i}</option>)}
+            </select>
+          </div>
+        )}
+
+        <div className="table-responsive card shadow-sm">
+          <table className="table table-hover mb-0">
+            <thead className="table-dark">
+              <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Bloco</th>
+                <th>Apto</th>
+                <th>Cargo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map(u => (
+                <tr key={u.morador_id}>
+                  <td>{u.nome}</td>
+                  <td>{u.email}</td>
+                  <td>{u.numero_bloco}</td>
+                  <td>{u.numero_apartamento}</td>
+                  <td><span className="badge bg-secondary">{u.role}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div className="table-responsive">
-          <table className="table table-striped">
-            <thead>
+      </div>
+    );
+  }
+
+  // --- VIEW: LISTA / ADMINISTRAÇÃO DE RECLAMAÇÕES ---
+  if (view === "list" || view === "admin") {
+    return (
+      <div className="container mt-4">
+        <BackButton />
+        <h3>{view === "list" ? "Minhas Reclamações" : "Gestão de Reclamações"}</h3>
+        <div className="table-responsive card shadow-sm mt-3">
+          <table className="table table-striped mb-0">
+            <thead className="table-dark">
               <tr>
                 <th>Data</th>
                 <th>Assunto</th>
@@ -273,25 +300,30 @@ const BackButton = () => (
                 <tr key={c.id}>
                   <td>{new Date(c.created_at).toLocaleDateString()}</td>
                   <td>{c.subject}</td>
-                  <td>
-                    <span className={`badge bg-${c.status === 'Resolvido' ? 'success' : 'warning'}`}>
-                      {c.status}
-                    </span>
-                  </td>
+                  <td><span className={`badge bg-${c.status === 'Resolvido' ? 'success' : 'warning'}`}>{c.status}</span></td>
                   <td>
                     <button className="btn btn-sm btn-info" onClick={() => {
                       setSelectedComplaint(c);
+                      setNewStatus(c.status);
+                      setAdminComment(c.admin_comment || "");
                       setShowModal(true);
-                    }}>Ver</button>
+                    }}>Ver Detalhes</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Modal de Detalhes e Ações (Simulado com uma div condicional para simplicidade) */}
+        {showModal && selectedComplaint && (
+          <div className="modal-backdrop show"></div>
+          /* Recomendo usar um componente Modal do Bootstrap aqui. 
+             Para simplificar, pode-se usar um alert ou uma view dedicada. */
+        )}
       </div>
     );
   }
 
-  return <div className="text-center mt-5">Carregando dados do dashboard...</div>;
+  return <div className="text-center mt-5">A carregar dashboard...</div>;
 }
