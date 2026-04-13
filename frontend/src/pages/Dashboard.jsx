@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
-
+  
   // --- CORREÇÃO PARTE 3: BUSCA DE DADOS DO USUÁRIO ---
   // Tentamos pegar do localStorage para evitar que os dados sumam no F5
   const getInitialUser = () => {
@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [newAdminComment, setNewAdminComment] = useState("");
+  const [adminComment, setAdminComment] = useState("");
 
   // Redireciona se não houver usuário logado
   useEffect(() => {
@@ -125,6 +126,34 @@ export default function Dashboard() {
       setIsSubmitting(false);
     }
   };
+
+  // Função para salvar alteração de status e ação tomada
+const handleUpdateComplaint = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/complaints/${selectedComplaint.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        status: newStatus, 
+        admin_comment: adminComment 
+      }),
+    });
+    if (res.ok) {
+      alert("Reclamação atualizada!");
+      setShowModal(false);
+      fetchComplaints();
+    }
+  } catch (error) {
+    alert("Erro ao atualizar.");
+  }
+};
+
+// --- Botão de Voltar (Padrão para todas as sub-telas) ---
+const BackButton = () => (
+  <button className="btn btn-outline-secondary mb-3" onClick={() => setView("menu")}>
+    ← Voltar ao Menu
+  </button>
+);
 
   // --- RENDERIZAÇÃO DO MENU PRINCIPAL ---
   if (view === "menu") {

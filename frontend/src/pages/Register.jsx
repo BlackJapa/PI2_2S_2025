@@ -11,6 +11,10 @@ export default function Register() {
   const [bloco, setBloco] = useState("");
   const [apartamento, setApartamento] = useState("");
   
+  // Novos estados para visualização das senhas
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const [message, setMessage] = useState({ type: "", text: "" });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -90,26 +94,49 @@ export default function Register() {
 
         <div className="row">
           <div className="col-md-6 mb-3">
-            <input
-              type="password"
-              className="form-control"
-              placeholder="Senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-            />
+            {/* Campo Senha com botão Ver/Ocultar */}
+            <div className="input-group">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="form-control"
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+              <button 
+                className="btn btn-outline-secondary" 
+                type="button" 
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isLoading}
+              >
+                {showPassword ? "Ocultar" : "Ver"}
+              </button>
+            </div>
           </div>
+          
           <div className="col-md-6 mb-3">
-            <input
-              type="password"
-              className="form-control"
-              placeholder="Confirmar Senha"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              disabled={isLoading}
-            />
+            {/* Campo Confirmar Senha com botão Ver/Ocultar */}
+            <div className="input-group">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                className="form-control"
+                placeholder="Confirmar Senha"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+              <button 
+                className="btn btn-outline-secondary" 
+                type="button" 
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={isLoading}
+              >
+                {showConfirmPassword ? "Ocultar" : "Ver"}
+              </button>
+            </div>
           </div>
         </div>
 

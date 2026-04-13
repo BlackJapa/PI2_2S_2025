@@ -187,3 +187,67 @@ def change_user_role(user_id):
         return jsonify({'error': 'Erro interno ao atualizar permissão'}), 500
     finally:
         if conn: conn.close()
+
+# --- Rota para Listar Usuários (Com Filtro por Bloco) ---
+@app.route('/api/users', methods=['GET'])
+def list_users():
+    user_id = request.args.get('user_id')
+    role = request.args.get('role')
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        if role == 'sindico':
+            # Master vê todos os moradores de todos os blocos
+            cursor.execute("""
+                SELECT m.morador_id, m.nome, m.email, m.role, a.numero_apartamento, b.numero_bloco
+                FROM Moradores m
+                LEFT JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
+                LEFT JOIN Blocos b ON a.bloco_id = b.bloco_id
+                ORDER BY b.numero_bloco, a.numero_apartamento
+            """)
+        elif role == 'admin_bloco':
+            # 1. Descobre o bloco do admin
+            cursor.execute("SELECT bloco_id FROM Apartamentos WHERE apartamento_id = (SELECT apartamento_id FROM Moradores WHERE morador_id = %s)", (user_id,))
+            res = cursor.fetchone()
+            if not res: return jsonify({'error': 'Admin sem bloco associado'}), 400
+            
+            bloco_id = res['bloco_id']
+            # 2. Busca apenas moradores daquele bloco
+            cursor.execute("""
+                SELECT m.morador_id, m.nome, m.email, m.role, a.numero_apartamento, b.numero_bloco
+                FROM Moradores m
+                JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
+                JOIN Blocos b ON a.bloco_id = b.bloco_id
+                WHERE a.bloco_id = %s
+                ORDER BY a.numero_apartamento
+            """, (bloco_id,))
+        else:
+            return jsonify({'error': 'Acesso negado'}), 403
+
+        return jsonify(cursor.fetchall()), 200
+    finally:
+        if conn: conn.close()
+
+# --- Rota para Atualizar Reclamação (Status e Comentário) ---
+@app.route('/api/complaints/<int:complaint_id>', methods=['PUT'])
+def update_complaint(complaint_id):
+    data = request.get_json()
+    new_status = data.get('status')
+    admin_comment = data.get('admin_comment') # As "Ações Tomadas"
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE Complaints 
+            SET status = %s, admin_comment = %s 
+            WHERE id = %s
+        """, (new_status, admin_comment, complaint_id))
+        conn.commit()
+        return jsonify({'message': 'Atualizado com sucesso!'}), 200
+    finally:
+        if conn: conn.close()   
