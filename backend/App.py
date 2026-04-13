@@ -114,37 +114,50 @@ def manage_complaints():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # SE FOR PARA CRIAR UMA RECLAMAÇÃO (POST)
         if request.method == 'POST':
             data = request.get_json()
-            user_id = data.get('user_id')
-            subject = data.get('subject')
-            description = data.get('description')
-            
+            # O assunto (subject) agora virá de uma lista pré-determinada
             cursor.execute("""
                 INSERT INTO Complaints (user_id, subject, description, status) 
                 VALUES (%s, %s, %s, 'Pendente')
-            """, (user_id, subject, description))
+            """, (data.get('user_id'), data.get('subject'), data.get('description')))
             conn.commit()
-            return jsonify({'message': 'Reclamação registrada com sucesso!'}), 201
+            return jsonify({'message': 'Reclamação registrada!'}), 201
 
-        # SE FOR PARA LISTAR RECLAMAÇÕES (GET)
         elif request.method == 'GET':
             user_id = request.args.get('user_id')
             role = request.args.get('role')
-            
-            # Síndico e Admin veem todas, Morador vê apenas as dele
-            if role in ['sindico', 'admin_bloco']:
+
+            if role == 'sindico':
+                # 1. MESTRE: Vê absolutamente tudo de todos os blocos
                 cursor.execute("SELECT * FROM Complaints ORDER BY id DESC")
+            
+            elif role == 'admin_bloco':
+                # 2. SÍNDICO DE BLOCO: Vê apenas reclamações do seu próprio bloco
+                # Primeiro descobrimos qual é o bloco deste admin
+                cursor.execute("""
+                    SELECT a.bloco_id FROM Apartamentos a 
+                    JOIN Moradores m ON m.apartamento_id = a.apartamento_id 
+                    WHERE m.morador_id = %s
+                """, (user_id,))
+                admin_bloco_id = cursor.fetchone()['bloco_id']
+
+                # Agora buscamos reclamações de moradores que moram no mesmo bloco
+                cursor.execute("""
+                    SELECT c.* FROM Complaints c
+                    JOIN Moradores m ON c.user_id = m.morador_id
+                    JOIN Apartamentos a ON m.apartamento_id = a.apartamento_id
+                    WHERE a.bloco_id = %s ORDER BY c.id DESC
+                """, (admin_bloco_id,))
+            
             else:
+                # 3. MORADOR: Vê apenas as suas
                 cursor.execute("SELECT * FROM Complaints WHERE user_id = %s ORDER BY id DESC", (user_id,))
             
-            complaints = cursor.fetchall()
-            return jsonify(complaints), 200
+            return jsonify(cursor.fetchall()), 200
 
     except Exception as e:
-        print(f"Erro nas reclamações: {e}")
-        return jsonify({'error': 'Erro interno do servidor'}), 500
+        return jsonify({'error': str(e)}), 500
     finally:
         if conn: conn.close()
 

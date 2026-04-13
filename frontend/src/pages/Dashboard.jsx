@@ -189,13 +189,19 @@ export default function Dashboard() {
       <div className="container mt-4">
         <h3>Nova Reclamação</h3>
         <form onSubmit={handleCreateComplaint}>
-          <input 
-            className="form-control mb-3" 
-            placeholder="Assunto" 
+          <select 
+            className="form-select mb-3" 
             value={subject} 
             onChange={(e) => setSubject(e.target.value)} 
-            required 
-          />
+            required
+          >
+            <option value="">Selecione o Assunto</option>
+            <option value="Cobrança">Cobrança</option>
+            <option value="Barulho">Barulho</option>
+            <option value="Limpeza">Limpeza</option>
+            <option value="Encomendas">Encomendas</option>
+            <option value="Serviços">Serviços</option>
+          </select>
           <textarea 
             className="form-control mb-3" 
             placeholder="Descrição detalhada" 
