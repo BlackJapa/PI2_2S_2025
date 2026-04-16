@@ -16,7 +16,7 @@ def get_db_connection():
 
 
 # --- Rota de Cadastro ---
-app.route('/api/register', methods=['POST'])
+@app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
     nome = data.get('nome')
@@ -35,33 +35,21 @@ def register():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 2. Encontrar o ID do apartamento
-        cursor.execute("""
-            SELECT a.apartamento_id FROM Apartamentos a
-            JOIN Blocos b ON a.bloco_id = b.bloco_id
-            WHERE b.numero_bloco = %s AND a.numero_apartamento = %s
-        """, (bloco, ap))
-        
+        # 2. Encontrar o ID do apartamento (SQL numa única linha)
+        cursor.execute("SELECT a.apartamento_id FROM Apartamentos a JOIN Blocos b ON a.bloco_id = b.bloco_id WHERE b.numero_bloco = %s AND a.numero_apartamento = %s", (bloco, ap))
         result = cursor.fetchone()
+        
         if not result:
             return jsonify({'error': f'O Bloco {bloco} ou Apartamento {ap} não existe no sistema.'}), 400
         
         ap_id = result['apartamento_id']
 
-        # 3. Inserir Morador
-        cursor.execute("""
-            INSERT INTO Moradores (nome, email, password, role)
-            VALUES (%s, %s, %s, 'morador')
-            RETURNING morador_id
-        """, (nome, email, password))
-        
+        # 3. Inserir Morador (SQL numa única linha para evitar o erro do RETURNING)
+        cursor.execute("INSERT INTO Moradores (nome, email, password, role) VALUES (%s, %s, %s, 'morador') RETURNING morador_id", (nome, email, password))
         novo_morador_id = cursor.fetchone()['morador_id']
 
         # 4. Criar o vínculo na tabela nova
-        cursor.execute("""
-            INSERT INTO Morador_Apartamentos (morador_id, apartamento_id)
-            VALUES (%s, %s)
-        """, (novo_morador_id, ap_id))
+        cursor.execute("INSERT INTO Morador_Apartamentos (morador_id, apartamento_id) VALUES (%s, %s)", (novo_morador_id, ap_id))
         
         conn.commit()
         return jsonify({'message': 'Registo efetuado com sucesso!'}), 201
@@ -71,12 +59,10 @@ def register():
         return jsonify({'error': 'Este e-mail já está registado.'}), 400
     except Exception as e:
         if conn: conn.rollback()
-        # MUDANÇA CRUCIAL: Agora o backend envia o erro real para o seu ecrã!
         return jsonify({'error': f'Falha no banco de dados: {str(e)}'}), 500
     finally:
         if conn: conn.close()
 
-        
 @app.route('/api/db-status', methods=['GET'])
 def db_status():
     return jsonify({'status': 'online'}), 200
