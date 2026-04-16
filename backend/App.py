@@ -21,7 +21,7 @@ def register():
     data = request.get_json()
     nome = data.get('nome')
     email = data.get('email')
-    password = generate_password_hash(data.get('password'))
+    password = generate_password_hash(data.get('password')) # Criptografa a senha
     bloco = str(data.get('bloco'))
     ap = str(data.get('apartamento'))
 
@@ -39,23 +39,35 @@ def register():
         
         result = cursor.fetchone()
         if not result:
-            return jsonify({'error': f'Bloco {bloco} ou Apartamento {ap} não cadastrados no sistema.'}), 400
+            return jsonify({'error': f'O Bloco {bloco} ou Apartamento {ap} não existe no sistema.'}), 400
         
         ap_id = result['apartamento_id']
 
-        # 2. Inserir o novo morador
+        # 2. Inserir o novo morador (sem a coluna apartamento_id) e devolver o ID criado
         cursor.execute("""
-            INSERT INTO Moradores (nome, email, password, role, apartamento_id)
-            VALUES (%s, %s, %s, 'morador', %s)
-        """, (nome, email, password, ap_id))
+            INSERT INTO Moradores (nome, email, password, role)
+            VALUES (%s, %s, %s, 'morador')
+            RETURNING morador_id
+        """, (nome, email, password))
+        
+        novo_morador_id = cursor.fetchone()['morador_id']
+
+        # 3. Criar a ligação do morador com o apartamento na NOVA tabela
+        cursor.execute("""
+            INSERT INTO Morador_Apartamentos (morador_id, apartamento_id)
+            VALUES (%s, %s)
+        """, (novo_morador_id, ap_id))
         
         conn.commit()
-        return jsonify({'message': 'Usuário cadastrado com sucesso!'}), 201
+        return jsonify({'message': 'Registo efetuado com sucesso!'}), 201
 
     except psycopg2.IntegrityError:
-        return jsonify({'error': 'Este e-mail já está cadastrado.'}), 400
+        if conn: conn.rollback()
+        return jsonify({'error': 'Este e-mail já está registado.'}), 400
     except Exception as e:
-        return jsonify({'error': f'Erro no servidor: {str(e)}'}), 500
+        if conn: conn.rollback()
+        print(f"Erro no registo: {e}")
+        return jsonify({'error': 'Erro interno do servidor ao registar.'}), 500
     finally:
         if conn: conn.close()
 
