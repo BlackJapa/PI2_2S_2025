@@ -16,21 +16,26 @@ def get_db_connection():
 
 
 # --- Rota de Cadastro ---
-@app.route('/api/register', methods=['POST'])
+app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
     nome = data.get('nome')
     email = data.get('email')
-    password = generate_password_hash(data.get('password')) # Criptografa a senha
-    bloco = str(data.get('bloco'))
-    ap = str(data.get('apartamento'))
+    password = generate_password_hash(data.get('password'))
+    
+    # 1. Garante que Bloco e Ap são números inteiros
+    try:
+        bloco = int(data.get('bloco'))
+        ap = int(data.get('apartamento'))
+    except ValueError:
+        return jsonify({'error': 'Bloco e Apartamento devem ser números válidos.'}), 400
 
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 1. Encontrar o ID do apartamento correto baseado no bloco e número
+        # 2. Encontrar o ID do apartamento
         cursor.execute("""
             SELECT a.apartamento_id FROM Apartamentos a
             JOIN Blocos b ON a.bloco_id = b.bloco_id
@@ -43,7 +48,7 @@ def register():
         
         ap_id = result['apartamento_id']
 
-        # 2. Inserir o novo morador (sem a coluna apartamento_id) e devolver o ID criado
+        # 3. Inserir Morador
         cursor.execute("""
             INSERT INTO Moradores (nome, email, password, role)
             VALUES (%s, %s, %s, 'morador')
@@ -52,7 +57,7 @@ def register():
         
         novo_morador_id = cursor.fetchone()['morador_id']
 
-        # 3. Criar a ligação do morador com o apartamento na NOVA tabela
+        # 4. Criar o vínculo na tabela nova
         cursor.execute("""
             INSERT INTO Morador_Apartamentos (morador_id, apartamento_id)
             VALUES (%s, %s)
@@ -66,11 +71,12 @@ def register():
         return jsonify({'error': 'Este e-mail já está registado.'}), 400
     except Exception as e:
         if conn: conn.rollback()
-        print(f"Erro no registo: {e}")
-        return jsonify({'error': 'Erro interno do servidor ao registar.'}), 500
+        # MUDANÇA CRUCIAL: Agora o backend envia o erro real para o seu ecrã!
+        return jsonify({'error': f'Falha no banco de dados: {str(e)}'}), 500
     finally:
         if conn: conn.close()
 
+        
 @app.route('/api/db-status', methods=['GET'])
 def db_status():
     return jsonify({'status': 'online'}), 200
