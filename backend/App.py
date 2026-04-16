@@ -23,12 +23,12 @@ def register():
     email = data.get('email')
     password = generate_password_hash(data.get('password'))
     
-    # 1. Garante que Bloco e Ap são números inteiros
-    try:
-        bloco = int(data.get('bloco'))
-        ap = int(data.get('apartamento'))
-    except ValueError:
-        return jsonify({'error': 'Bloco e Apartamento devem ser números válidos.'}), 400
+    # Tratamos como texto (string) para combinar com o seu VARCHAR no banco
+    bloco = str(data.get('bloco')).strip()
+    ap = str(data.get('apartamento')).strip()
+
+    if not bloco or not ap:
+        return jsonify({'error': 'Bloco e Apartamento são obrigatórios.'}), 400
 
     conn = None
     try:
@@ -44,7 +44,7 @@ def register():
         
         ap_id = result['apartamento_id']
 
-        # 3. Inserir Morador (SQL numa única linha para evitar o erro do RETURNING)
+        # 3. Inserir Morador
         cursor.execute("INSERT INTO Moradores (nome, email, password, role) VALUES (%s, %s, %s, 'morador') RETURNING morador_id", (nome, email, password))
         novo_morador_id = cursor.fetchone()['morador_id']
 
@@ -63,6 +63,7 @@ def register():
     finally:
         if conn: conn.close()
 
+        
 @app.route('/api/db-status', methods=['GET'])
 def db_status():
     return jsonify({'status': 'online'}), 200
