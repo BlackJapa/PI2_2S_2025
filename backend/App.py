@@ -180,6 +180,38 @@ def manage_complaints():
     finally:
         if conn: conn.close()
 
+# --- Rota para Listar todos os Blocos ---
+@app.route('/api/blocks', methods=['GET'])
+def get_blocks():
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT bloco_id, numero_bloco FROM Blocos ORDER BY numero_bloco")
+        blocks = cursor.fetchall()
+        return jsonify(blocks), 200
+    finally:
+        if conn: conn.close()
+
+# --- Rota para Listar Apartamentos de um Bloco específico ---
+@app.route('/api/blocks/<int:numero_bloco>/apartments', methods=['GET'])
+def get_apartments_by_block(numero_bloco):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.numero_apartamento 
+            FROM Apartamentos a
+            JOIN Blocos b ON a.bloco_id = b.bloco_id
+            WHERE b.numero_bloco = %s
+            ORDER BY a.numero_apartamento
+        """, (numero_bloco,))
+        apartments = cursor.fetchall()
+        return jsonify(apartments), 200
+    finally:
+        if conn: conn.close()
+
 @app.route('/api/users/<int:user_id>/role', methods=['PUT'])
 def change_user_role(user_id):
     data = request.get_json()
