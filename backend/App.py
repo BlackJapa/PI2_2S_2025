@@ -22,12 +22,17 @@ def register():
     nome = data.get('nome')
     email = data.get('email')
     password = generate_password_hash(data.get('password'))
-    
+
+    print(f"\n--- INICIANDO NOVO CADASTRO ---")
+    print(f"👤 Nome: {nome} | E-mail: {email}")
+
     # 1. TRAVA DE SEGURANÇA: Garante que Bloco e Ap são números inteiros puros
     try:
         bloco = int(data.get('bloco'))
         ap = int(data.get('apartamento'))
+        print(f"🏢 Dados recebidos -> Bloco: {bloco} (Tipo: {type(bloco)}), Apto: {ap} (Tipo: {type(ap)})")
     except (ValueError, TypeError):
+        print("❌ ERRO: Bloco ou Apartamento não são inteiros.")
         return jsonify({'error': 'Bloco e Apartamento devem ser apenas números inteiros.'}), 400
 
     conn = None
@@ -36,29 +41,39 @@ def register():
         cursor = conn.cursor()
 
         # 2. Encontrar o ID do apartamento (Buscando por números inteiros)
+        print(f"🔎 BUSCANDO APARTAMENTO NO BANCO...")
         cursor.execute("SELECT a.apartamento_id FROM Apartamentos a JOIN Blocos b ON a.bloco_id = b.bloco_id WHERE b.numero_bloco = %s AND a.numero_apartamento = %s", (bloco, ap))
         result = cursor.fetchone()
         
         if not result:
+            print(f"❌ ERRO: Apartamento não encontrado no banco de dados.")
             return jsonify({'error': f'O Bloco {bloco} ou Apartamento {ap} não existe no condomínio.'}), 400
         
         ap_id = result['apartamento_id']
+        print(f"✅ APARTAMENTO ENCONTRADO: ID {ap_id} (Tipo: {type(ap_id)})")
 
         # 3. Inserir Morador
+        print("⏳ A INSERIR MORADOR NA TABELA 'Moradores'...")
         cursor.execute("INSERT INTO Moradores (nome, email, password, role) VALUES (%s, %s, %s, 'morador') RETURNING morador_id", (nome, email, password))
         novo_morador_id = cursor.fetchone()['morador_id']
+        print(f"✅ MORADOR CRIADO: ID {novo_morador_id} (Tipo: {type(novo_morador_id)})")
 
         # 4. Criar o vínculo na tabela de Múltiplos Apartamentos
+        print("⏳ A CRIAR VÍNCULO NA TABELA 'Morador_Apartamentos'...")
         cursor.execute("INSERT INTO Morador_Apartamentos (morador_id, apartamento_id) VALUES (%s, %s)", (novo_morador_id, ap_id))
+        print("✅ VÍNCULO CRIADO COM SUCESSO!")
         
         conn.commit()
+        print("🎉 CADASTRO FINALIZADO COM SUCESSO! ---\n")
         return jsonify({'message': 'Registo efetuado com sucesso!'}), 201
 
     except psycopg2.IntegrityError:
         if conn: conn.rollback()
+        print("❌ ERRO: E-mail já cadastrado.")
         return jsonify({'error': 'Este e-mail já está registado no sistema.'}), 400
     except Exception as e:
         if conn: conn.rollback()
+        print(f"🔥 ERRO CRÍTICO NO BANCO DE DADOS: {str(e)}")
         return jsonify({'error': f'Erro no banco de dados: {str(e)}'}), 500
     finally:
         if conn: conn.close()
