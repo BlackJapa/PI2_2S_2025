@@ -13,7 +13,7 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode='require')
 
-# --- Rota de Cadastro ---
+# --- Rota de Cadastro Corrigida ---
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -21,54 +21,47 @@ def register():
     email = data.get('email')
     password = generate_password_hash(data.get('password'))
 
-    print(f"\n--- INICIANDO NOVO CADASTRO ---")
-    print(f"👤 Nome: {nome} | E-mail: {email}")
-
-    # 1. TRAVA DE SEGURANÇA: Garante que Bloco e Ap são números inteiros puros
     try:
-        bloco = int(data.get('bloco'))
-        ap = int(data.get('apartamento'))
+        # Garantimos que recebemos apenas o número, removendo qualquer texto
+        bloco = int(''.join(filter(str.isdigit, str(data.get('bloco')))))
+        ap = int(''.join(filter(str.isdigit, str(data.get('apartamento')))))
     except (ValueError, TypeError):
-        return jsonify({'error': 'Bloco e Apartamento devem ser apenas números inteiros.'}), 400
+        return jsonify({'error': 'Bloco e Apartamento devem conter números.'}), 400
 
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 2. Encontrar o ID do apartamento
-        cursor.execute("SELECT a.apartamento_id FROM Apartamentos a JOIN Blocos b ON a.bloco_id = b.bloco_id WHERE b.numero_bloco = %s AND a.numero_apartamento = %s", (bloco, ap))
+        # Nomes de tabelas em minúsculas e sem aspas para compatibilidade total
+        cursor.execute('''
+            SELECT a.apartamento_id FROM apartamentos a 
+            JOIN blocos b ON a.bloco_id = b.bloco_id 
+            WHERE b.numero_bloco = %s AND a.numero_apartamento = %s
+        ''', (bloco, ap))
         result = cursor.fetchone()
         
         if not result:
-            return jsonify({'error': f'O Bloco {bloco} ou Apartamento {ap} não existe no condomínio.'}), 400
+            return jsonify({'error': f'O Bloco {bloco} ou Apartamento {ap} não existe.'}), 400
         
         ap_id = result['apartamento_id']
 
-        # 3. Inserir Morador
-        cursor.execute("INSERT INTO Moradores (nome, email, password, role) VALUES (%s, %s, %s, 'morador') RETURNING morador_id", (nome, email, password))
+        cursor.execute('''
+            INSERT INTO moradores (nome, email, password, role) 
+            VALUES (%s, %s, %s, 'morador') RETURNING morador_id
+        ''', (nome, email, password))
         novo_morador_id = cursor.fetchone()['morador_id']
 
-        # 4. Criar o vínculo na tabela de Múltiplos Apartamentos
-        cursor.execute("INSERT INTO Morador_Apartamentos (morador_id, apartamento_id) VALUES (%s, %s)", (novo_morador_id, ap_id))
+        cursor.execute('''
+            INSERT INTO morador_apartamentos (morador_id, apartamento_id) 
+            VALUES (%s, %s)
+        ''', (novo_morador_id, ap_id))
         
         conn.commit()
         return jsonify({'message': 'Registo efetuado com sucesso!'}), 201
-
-    except psycopg2.IntegrityError as e:
-        if conn: conn.rollback()
-        erro_real = str(e)
-        print(f"❌ ERRO DE INTEGRIDADE DETETADO: {erro_real}")
-        
-        # Se o erro falar especificamente do email, mostramos a mensagem normal
-        if "email" in erro_real.lower() or "moradores_email_key" in erro_real.lower():
-            return jsonify({'error': 'Este e-mail já está registado no sistema.'}), 400
-        
-        # Se for outra coisa, vamos cuspir o erro real na tela para o resolvermos!
-        return jsonify({'error': f'Bloqueio do Banco de Dados: {erro_real}'}), 400
     except Exception as e:
         if conn: conn.rollback()
-        return jsonify({'error': f'Erro no banco de dados: {str(e)}'}), 500
+        return jsonify({'error': f'Erro no banco: {str(e)}'}), 500
     finally:
         if conn: conn.close()
 
@@ -76,42 +69,32 @@ def register():
 def db_status():
     return jsonify({'status': 'online'}), 200
 
-# --- Rota de Login ---
+# --- Rota de Login Corrigida ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM Moradores WHERE email = %s", (email,))
+        cursor.execute('SELECT * FROM moradores WHERE email = %s', (data.get('email'),))
         user = cursor.fetchone()
 
-        if user and check_password_hash(user['password'], password):
-            cursor.execute("""
+        if user and check_password_hash(user['password'], data.get('password')):
+            cursor.execute('''
                 SELECT a.numero_apartamento, b.numero_bloco 
-                FROM Morador_Apartamentos ma
-                JOIN Apartamentos a ON ma.apartamento_id = a.apartamento_id
-                JOIN Blocos b ON a.bloco_id = b.bloco_id
+                FROM morador_apartamentos ma
+                JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
+                JOIN blocos b ON a.bloco_id = b.bloco_id
                 WHERE ma.morador_id = %s
-            """, (user['morador_id'],))
-            
-            apartamentos = cursor.fetchall()
-            
+            ''', (user['morador_id'],))
             return jsonify({
                 'id': user['morador_id'],
                 'nome': user['nome'],
                 'role': user['role'],
-                'apartamentos': apartamentos
+                'apartamentos': cursor.fetchall()
             }), 200
-        
-        return jsonify({'error': 'E-mail ou senha incorretos'}), 401
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Credenciais inválidas'}), 401
     finally:
         if conn: conn.close()
 
