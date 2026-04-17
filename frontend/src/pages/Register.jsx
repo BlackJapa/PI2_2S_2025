@@ -56,6 +56,11 @@ export default function Register() {
       return;
     }
 
+    // A MÁGICA ACONTECE AQUI:
+    // Limpamos qualquer texto (como "Bloco " ou "Apto ") e deixamos só os números
+    const blocoLimpo = String(bloco).replace(/\D/g, "");
+    const aptoLimpo = String(apartamento).replace(/\D/g, "");
+
     try {
       const response = await fetch(`${API_URL}/api/register`, {
         method: 'POST',
@@ -64,8 +69,8 @@ export default function Register() {
           nome, 
           email, 
           password, 
-          bloco: String(bloco), 
-          apartamento: String(apartamento) 
+          bloco: blocoLimpo, 
+          apartamento: aptoLimpo 
         }),
       });
 
