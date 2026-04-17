@@ -9,13 +9,11 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   
-  // Estados para o filtro em cascata
   const [bloco, setBloco] = useState("");
   const [apartamento, setApartamento] = useState("");
-  const [blocks, setBlocks] = useState([]); // Lista de blocos do servidor
-  const [availableApartments, setAvailableApartments] = useState([]); // Aptos do bloco escolhido
+  const [blocks, setBlocks] = useState([]); 
+  const [availableApartments, setAvailableApartments] = useState([]); 
   
-  // Estados para visualização das senhas
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
@@ -24,22 +22,43 @@ export default function Register() {
 
   const navigate = useNavigate();
 
-  // 1. Carrega a lista de blocos ao abrir a página
+  // 1. CARREGA OS BLOCOS (Agora protegido contra erros do servidor)
   useEffect(() => {
     fetch(`${API_URL}/api/blocks`)
       .then(res => res.json())
-      .then(data => setBlocks(data))
-      .catch(err => console.error("Erro ao carregar blocos:", err));
+      .then(data => {
+        // Só guarda se for uma lista (Array). Se for erro, mantém vazio.
+        if (Array.isArray(data)) {
+          setBlocks(data);
+        } else {
+          console.error("Erro do backend ao pedir blocos:", data);
+          setBlocks([]); 
+        }
+      })
+      .catch(err => {
+        console.error("Erro de conexão ao carregar blocos:", err);
+        setBlocks([]);
+      });
   }, []);
 
-  // 2. Carrega os apartamentos sempre que o bloco selecionado mudar
+  // 2. CARREGA OS APARTAMENTOS (Também protegido)
   useEffect(() => {
     if (bloco) {
-      setApartamento(""); // Limpa o apartamento selecionado anteriormente
+      setApartamento(""); 
       fetch(`${API_URL}/api/blocks/${bloco}/apartments`)
         .then(res => res.json())
-        .then(data => setAvailableApartments(data))
-        .catch(err => console.error("Erro ao carregar apartamentos:", err));
+        .then(data => {
+          if (Array.isArray(data)) {
+            setAvailableApartments(data);
+          } else {
+            console.error("Erro do backend ao pedir apartamentos:", data);
+            setAvailableApartments([]);
+          }
+        })
+        .catch(err => {
+          console.error("Erro de conexão ao carregar apartamentos:", err);
+          setAvailableApartments([]);
+        });
     } else {
       setAvailableApartments([]);
     }
@@ -56,8 +75,7 @@ export default function Register() {
       return;
     }
 
-    // A MÁGICA ACONTECE AQUI:
-    // Limpamos qualquer texto (como "Bloco " ou "Apto ") e deixamos só os números
+    // Limpa qualquer texto extra e envia apenas o número puro
     const blocoLimpo = String(bloco).replace(/\D/g, "");
     const aptoLimpo = String(apartamento).replace(/\D/g, "");
 
@@ -88,6 +106,8 @@ export default function Register() {
       setIsLoading(false);
     }
   };
+
+  // ... (o resto do código com o return ( <div className="register-container"... fica igual)
 
   return (
     <div className="register-container container mt-5" style={{ maxWidth: '550px' }}>
@@ -183,6 +203,7 @@ export default function Register() {
           <div className="row">
             <div className="col-md-6 mb-3">
               <label htmlFor="bloco" className="form-label fw-bold">Bloco</label>
+              {/* Seletor de Blocos */}
               <select 
                 id="bloco"
                 name="bloco"
@@ -190,18 +211,17 @@ export default function Register() {
                 value={bloco} 
                 onChange={(e) => setBloco(e.target.value)} 
                 required
-                disabled={isLoading || blocks.length === 0}
+                disabled={isLoading || !Array.isArray(blocks) || blocks.length === 0}
               >
                 <option value="">Selecione o Bloco</option>
-                {blocks.map(b => (
+                {Array.isArray(blocks) && blocks.map(b => (
                   <option key={b.bloco_id} value={b.numero_bloco}>
                     Bloco {b.numero_bloco}
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="col-md-6 mb-3">
-              <label htmlFor="apartamento" className="form-label fw-bold">Apartamento</label>
+
+              {/* Seletor de Apartamentos */}
               <select 
                 id="apartamento"
                 name="apartamento"
@@ -212,7 +232,7 @@ export default function Register() {
                 disabled={isLoading || !bloco}
               >
                 <option value="">Selecione o Apto</option>
-                {availableApartments.map((a, idx) => (
+                {Array.isArray(availableApartments) && availableApartments.map((a, idx) => (
                   <option key={idx} value={a.numero_apartamento}>
                     Apto {a.numero_apartamento}
                   </option>
