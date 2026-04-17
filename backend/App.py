@@ -55,9 +55,17 @@ def register():
         conn.commit()
         return jsonify({'message': 'Registo efetuado com sucesso!'}), 201
 
-    except psycopg2.IntegrityError:
+    except psycopg2.IntegrityError as e:
         if conn: conn.rollback()
-        return jsonify({'error': 'Este e-mail já está registado no sistema.'}), 400
+        erro_real = str(e)
+        print(f"❌ ERRO DE INTEGRIDADE DETETADO: {erro_real}")
+        
+        # Se o erro falar especificamente do email, mostramos a mensagem normal
+        if "email" in erro_real.lower() or "moradores_email_key" in erro_real.lower():
+            return jsonify({'error': 'Este e-mail já está registado no sistema.'}), 400
+        
+        # Se for outra coisa, vamos cuspir o erro real na tela para o resolvermos!
+        return jsonify({'error': f'Bloqueio do Banco de Dados: {erro_real}'}), 400
     except Exception as e:
         if conn: conn.rollback()
         return jsonify({'error': f'Erro no banco de dados: {str(e)}'}), 500
