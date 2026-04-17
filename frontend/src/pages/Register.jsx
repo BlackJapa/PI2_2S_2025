@@ -96,8 +96,11 @@ export default function Register() {
         
         <form onSubmit={handleRegister}>
           <div className="mb-3">
-            <label className="form-label fw-bold">Nome Completo</label>
+            {/* O htmlFor liga a label ao input com o mesmo id */}
+            <label htmlFor="nome" className="form-label fw-bold">Nome Completo</label>
             <input
+              id="nome"
+              name="nome"
               type="text"
               className="form-control"
               placeholder="Ex: João Silva"
@@ -105,12 +108,15 @@ export default function Register() {
               onChange={(e) => setNome(e.target.value)}
               required
               disabled={isLoading}
+              autoComplete="name"
             />
           </div>
 
           <div className="mb-3">
-            <label className="form-label fw-bold">E-mail</label>
+            <label htmlFor="email" className="form-label fw-bold">E-mail</label>
             <input
+              id="email"
+              name="email"
               type="email"
               className="form-control"
               placeholder="exemplo@email.com"
@@ -118,14 +124,17 @@ export default function Register() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
+              autoComplete="email"
             />
           </div>
 
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Senha</label>
+              <label htmlFor="password" className="form-label fw-bold">Senha</label>
               <div className="input-group">
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
                   className="form-control"
                   placeholder="Mín. 6 caracteres"
@@ -133,6 +142,7 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
+                  autoComplete="new-password"
                 />
                 <button 
                   className="btn btn-outline-secondary" 
@@ -145,9 +155,11 @@ export default function Register() {
             </div>
             
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Confirmar Senha</label>
+              <label htmlFor="confirmPassword" className="form-label fw-bold">Confirmar Senha</label>
               <div className="input-group">
                 <input
+                  id="confirmPassword"
+                  name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   className="form-control"
                   placeholder="Repita a senha"
@@ -155,6 +167,7 @@ export default function Register() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   disabled={isLoading}
+                  autoComplete="new-password"
                 />
                 <button 
                   className="btn btn-outline-secondary" 
@@ -169,8 +182,10 @@ export default function Register() {
 
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Bloco</label>
+              <label htmlFor="bloco" className="form-label fw-bold">Bloco</label>
               <select 
+                id="bloco"
+                name="bloco"
                 className="form-select" 
                 value={bloco} 
                 onChange={(e) => setBloco(e.target.value)} 
@@ -186,8 +201,10 @@ export default function Register() {
               </select>
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label fw-bold">Apartamento</label>
+              <label htmlFor="apartamento" className="form-label fw-bold">Apartamento</label>
               <select 
+                id="apartamento"
+                name="apartamento"
                 className="form-select" 
                 value={apartamento} 
                 onChange={(e) => setApartamento(e.target.value)} 
