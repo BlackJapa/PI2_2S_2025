@@ -7,7 +7,6 @@ export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // --- BUSCA DE DADOS DO USUÁRIO E PERSISTÊNCIA ---
   const getInitialUser = () => {
     const savedUser = localStorage.getItem("user");
     if (savedUser) return JSON.parse(savedUser);
@@ -15,41 +14,60 @@ export default function Dashboard() {
   };
 
   const [user, setUser] = useState(getInitialUser());
-  // Proteção: Garante que activeApt comece como null se não houver dados
-  //const [activeApt, setActiveApt] = useState(user?.apartamentos?.[0] || null);
-  //const [view, setView] = useState("menu");
-  const [activeApt, setActiveApt] = useState(user?.apartamento || null);
-  
-  // Estados de Listas
+
+  // BUG CORRIGIDO: estado 'view' estava comentado mas era usado em todo o componente
+  const [view, setView] = useState("menu");
+
+  // Suporte a múltiplos apartamentos
+  const [activeApt, setActiveApt] = useState(() => {
+    const u = getInitialUser();
+    return u?.apartamento || u?.apartamentos?.[0] || null;
+  });
+
+  // Estados de listas
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
-  const [selectedBlock, setSelectedBlock] = useState(""); 
 
-  // Estados para Reclamações
+  // Estados para reclamações
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Estados para Gestão Administrativa
+
+  // Estados para modal de detalhes
   const [showModal, setShowModal] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [adminComment, setAdminComment] = useState("");
+
+  // Estados para vincular novo apartamento
+  const [showLinkApt, setShowLinkApt] = useState(false);
+  const [blocks, setBlocks] = useState([]);
+  const [linkBloco, setLinkBloco] = useState("");
+  const [linkApartamento, setLinkApartamento] = useState("");
+  const [availableApts, setAvailableApts] = useState([]);
+  const [linkMsg, setLinkMsg] = useState({ type: "", text: "" });
+  const [isLinking, setIsLinking] = useState(false);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
     navigate("/");
   };
 
-  // --- FUNÇÕES DE BUSCA (FETCH) ---
+  // Atualiza o apartamento ativo e persiste no localStorage
+  const handleSwitchApt = (apt) => {
+    setActiveApt(apt);
+    const updated = { ...user, apartamento: apt };
+    setUser(updated);
+    localStorage.setItem("user", JSON.stringify(updated));
+  };
+
+  // --- FETCH DE DADOS ---
   const fetchComplaints = useCallback(async () => {
     if (!user) return;
     try {
       const res = await fetch(`${API_URL}/api/complaints?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setComplaints(data);
-      }
+      if (Array.isArray(data)) setComplaints(data);
     } catch (err) {
       console.error("Erro ao carregar reclamações:", err);
     }
@@ -60,23 +78,42 @@ export default function Dashboard() {
     try {
       const res = await fetch(`${API_URL}/api/users?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setUsers(data);
-      }
+      if (Array.isArray(data)) setUsers(data);
     } catch (err) {
       console.error("Erro ao carregar usuários:", err);
     }
   }, [user]);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
+    if (!user) { navigate("/"); return; }
     fetchComplaints();
     if (user.role !== 'morador') fetchUsers();
   }, [user, navigate, fetchComplaints, fetchUsers]);
 
+  // Carrega blocos quando abre o painel de vincular apartamento
+  useEffect(() => {
+    if (showLinkApt && blocks.length === 0) {
+      fetch(`${API_URL}/api/blocks`)
+        .then(r => r.json())
+        .then(d => { if (Array.isArray(d)) setBlocks(d); })
+        .catch(() => {});
+    }
+  }, [showLinkApt]);
+
+  // Carrega apartamentos ao escolher bloco
+  useEffect(() => {
+    if (linkBloco) {
+      setLinkApartamento("");
+      fetch(`${API_URL}/api/blocks/${linkBloco}/apartments`)
+        .then(r => r.json())
+        .then(d => { if (Array.isArray(d)) setAvailableApts(d); })
+        .catch(() => setAvailableApts([]));
+    } else {
+      setAvailableApts([]);
+    }
+  }, [linkBloco]);
+
+  // --- ENVIAR RECLAMAÇÃO ---
   const handleSubmitComplaint = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -84,11 +121,7 @@ export default function Dashboard() {
       const res = await fetch(`${API_URL}/api/complaints`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          subject,
-          description
-        })
+        body: JSON.stringify({ user_id: user.id, subject, description })
       });
       if (res.ok) {
         alert("Reclamação enviada!");
@@ -104,6 +137,7 @@ export default function Dashboard() {
     }
   };
 
+  // --- ATUALIZAR STATUS (admin) ---
   const handleUpdateStatus = async () => {
     try {
       const res = await fetch(`${API_URL}/api/complaints/${selectedComplaint.id}`, {
@@ -120,28 +154,138 @@ export default function Dashboard() {
     }
   };
 
-  // --- COMPONENTES DE INTERFACE ---
+  // --- VINCULAR NOVO APARTAMENTO ---
+  const handleLinkApartment = async (e) => {
+    e.preventDefault();
+    setIsLinking(true);
+    setLinkMsg({ type: "", text: "" });
+    try {
+      const res = await fetch(`${API_URL}/api/apartments/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ morador_id: user.id, bloco: linkBloco, apartamento: linkApartamento })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLinkMsg({ type: "success", text: "Apartamento vinculado com sucesso!" });
+        // Atualiza a lista localmente
+        const updatedApts = [...(user.apartamentos || []), data];
+        const updatedUser = { ...user, apartamentos: updatedApts };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        setLinkBloco("");
+        setLinkApartamento("");
+        setTimeout(() => setShowLinkApt(false), 1500);
+      } else {
+        setLinkMsg({ type: "error", text: data.error || "Erro ao vincular." });
+      }
+    } catch (err) {
+      setLinkMsg({ type: "error", text: "Erro de conexão." });
+    } finally {
+      setIsLinking(false);
+    }
+  };
+
   if (!user) return null;
+
+  const apartamentos = user.apartamentos || (user.apartamento ? [user.apartamento] : []);
 
   return (
     <div className="container py-4">
-      {/* Cabeçalho de Identificação - BLINDADO contra Null */}
+
+      {/* Cabeçalho */}
       <div className="card mb-4 shadow-sm border-0">
-        <div className="card-body d-flex justify-content-between align-items-center">
+        <div className="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
             <h4 className="mb-1 text-primary">Olá, {user?.nome || "Utilizador"}</h4>
             {activeApt ? (
               <p className="mb-0 text-muted">
-                <strong>Apartamento:</strong> {activeApt?.numero_apartamento} — 
-                <strong> Bloco:</strong> {activeApt?.numero_bloco}
+                <strong>Apartamento ativo:</strong> {activeApt.numero_apartamento} —{" "}
+                <strong>Bloco:</strong> {activeApt.numero_bloco}
               </p>
             ) : (
               <p className="mb-0 text-danger small">Nenhum apartamento vinculado.</p>
             )}
             <span className="badge bg-light text-dark border mt-1">Perfil: {user?.role}</span>
           </div>
-          <button onClick={handleLogout} className="btn btn-outline-danger btn-sm">Sair</button>
+          <div className="d-flex gap-2 align-items-center flex-wrap">
+            {/* Seletor de apartamentos (caso tenha mais de um) */}
+            {apartamentos.length > 1 && (
+              <select
+                className="form-select form-select-sm"
+                style={{ width: 'auto' }}
+                value={activeApt?.apartamento_id || ""}
+                onChange={(e) => {
+                  const apt = apartamentos.find(a => String(a.apartamento_id) === e.target.value);
+                  if (apt) handleSwitchApt(apt);
+                }}
+              >
+                {apartamentos.map((a) => (
+                  <option key={a.apartamento_id} value={a.apartamento_id}>
+                    Bloco {a.numero_bloco} — Apto {a.numero_apartamento}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => setShowLinkApt(!showLinkApt)}
+              title="Vincular outro apartamento"
+            >
+              + Apartamento
+            </button>
+            <button onClick={handleLogout} className="btn btn-outline-danger btn-sm">Sair</button>
+          </div>
         </div>
+
+        {/* Painel de vincular novo apartamento */}
+        {showLinkApt && (
+          <div className="card-footer bg-light">
+            <p className="fw-bold mb-2 small">Vincular novo apartamento</p>
+            <form onSubmit={handleLinkApartment} className="d-flex gap-2 flex-wrap align-items-end">
+              <div>
+                <label className="form-label small mb-1">Bloco</label>
+                <select
+                  className="form-select form-select-sm"
+                  value={linkBloco}
+                  onChange={(e) => setLinkBloco(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  {blocks.map(b => (
+                    <option key={b.bloco_id} value={b.numero_bloco}>Bloco {b.numero_bloco}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label small mb-1">Apartamento</label>
+                <select
+                  className="form-select form-select-sm"
+                  value={linkApartamento}
+                  onChange={(e) => setLinkApartamento(e.target.value)}
+                  required
+                  disabled={!linkBloco}
+                >
+                  <option value="">Selecione</option>
+                  {availableApts.map((a, i) => (
+                    <option key={i} value={a.numero_apartamento}>Apto {a.numero_apartamento}</option>
+                  ))}
+                </select>
+              </div>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={isLinking}>
+                {isLinking ? "Vinculando..." : "Vincular"}
+              </button>
+              <button className="btn btn-outline-secondary btn-sm" type="button" onClick={() => setShowLinkApt(false)}>
+                Cancelar
+              </button>
+            </form>
+            {linkMsg.text && (
+              <div className={`alert ${linkMsg.type === 'error' ? 'alert-danger' : 'alert-success'} mt-2 py-2 mb-0 small`}>
+                {linkMsg.text}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Navegação Principal */}
@@ -154,7 +298,33 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Vistas Condicionais */}
+      {/* Vista: Menu */}
+      {view === "menu" && (
+        <div className="row g-3">
+          <div className="col-md-4">
+            <div className="card text-center p-3 shadow-sm h-100" role="button" onClick={() => setView("registrar")}>
+              <div className="fs-1">📝</div>
+              <h6 className="mt-2">Nova Reclamação</h6>
+            </div>
+          </div>
+          <div className="col-md-4">
+            <div className="card text-center p-3 shadow-sm h-100" role="button" onClick={() => setView("visualizar")}>
+              <div className="fs-1">📋</div>
+              <h6 className="mt-2">Ver Histórico</h6>
+            </div>
+          </div>
+          {user.role !== 'morador' && (
+            <div className="col-md-4">
+              <div className="card text-center p-3 shadow-sm h-100" role="button" onClick={() => setView("admin")}>
+                <div className="fs-1">⚙️</div>
+                <h6 className="mt-2">Gestão</h6>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Vista: Registrar Reclamação */}
       {view === "registrar" && (
         <div className="card p-4 shadow-sm">
           <h5 className="mb-4">Registrar Ocorrência</h5>
@@ -166,6 +336,7 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Vista: Histórico */}
       {view === "visualizar" && (
         <div className="table-responsive">
           <table className="table table-hover shadow-sm bg-white rounded">
@@ -180,10 +351,10 @@ export default function Dashboard() {
             <tbody>
               {complaints.length > 0 ? complaints.map((c) => (
                 <tr key={c.id}>
-                  <td>{new Date(c.created_at).toLocaleDateString()}</td>
+                  <td>{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
                   <td>{c.subject}</td>
                   <td>
-                    <span className={`badge ${c.status === 'Resolvido' ? 'bg-success' : 'bg-warning text-dark'}`}>
+                    <span className={`badge ${c.status === 'Resolvido' ? 'bg-success' : c.status === 'Em Análise' ? 'bg-info' : 'bg-warning text-dark'}`}>
                       {c.status}
                     </span>
                   </td>
@@ -197,14 +368,39 @@ export default function Dashboard() {
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan="4" className="text-center py-4">Nenhuma reclamação encontrada.</td></tr>
+                <tr><td colSpan="4" className="text-center py-4 text-muted">Nenhuma reclamação encontrada.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Modal de Detalhes (Versão Simplificada Integrada) */}
+      {/* Vista: Gestão (admin/síndico) */}
+      {view === "admin" && (
+        <div className="table-responsive">
+          <h5 className="mb-3">Gestão de Moradores</h5>
+          <table className="table table-hover shadow-sm bg-white rounded">
+            <thead className="table-light">
+              <tr><th>Nome</th><th>E-mail</th><th>Bloco</th><th>Apto</th><th>Perfil</th></tr>
+            </thead>
+            <tbody>
+              {users.length > 0 ? users.map((u) => (
+                <tr key={u.morador_id}>
+                  <td>{u.nome}</td>
+                  <td>{u.email}</td>
+                  <td>{u.numero_bloco || "—"}</td>
+                  <td>{u.numero_apartamento || "—"}</td>
+                  <td><span className="badge bg-secondary">{u.role}</span></td>
+                </tr>
+              )) : (
+                <tr><td colSpan="5" className="text-center py-4 text-muted">Nenhum usuário encontrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modal de Detalhes */}
       {showModal && selectedComplaint && (
         <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
           <div className="card w-75 shadow-lg" style={{ maxWidth: '600px' }}>
@@ -231,7 +427,7 @@ export default function Dashboard() {
               ) : (
                 <div className="bg-light p-3 rounded">
                   <p><strong>Status Atual:</strong> <span className="badge bg-primary">{selectedComplaint.status}</span></p>
-                  <p><strong>Resposta da Administração:</strong> {selectedComplaint.admin_comment || "Aguardando resposta..."}</p>
+                  <p className="mb-0"><strong>Resposta:</strong> {selectedComplaint.admin_comment || "Aguardando resposta..."}</p>
                 </div>
               )}
             </div>
