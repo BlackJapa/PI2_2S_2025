@@ -16,8 +16,9 @@ export default function Dashboard() {
 
   const [user, setUser] = useState(getInitialUser());
   // Proteção: Garante que activeApt comece como null se não houver dados
-  const [activeApt, setActiveApt] = useState(user?.apartamentos?.[0] || null);
-  const [view, setView] = useState("menu");
+  //const [activeApt, setActiveApt] = useState(user?.apartamentos?.[0] || null);
+  //const [view, setView] = useState("menu");
+  const [activeApt, setActiveApt] = useState(user?.apartamento || null);
   
   // Estados de Listas
   const [complaints, setComplaints] = useState([]);

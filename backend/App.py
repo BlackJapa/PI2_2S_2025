@@ -14,7 +14,7 @@ def get_db_connection():
     # Adicionamos o connect_timeout para evitar que o Render fique 'pendurado'
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode='require', connect_timeout=10)
 
-# --- ROTA DE CADASTRO (Unificada em minúsculas) ---
+# --- Registo Simplificado (1 Morador -> 1 Apartamento) ---
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -22,86 +22,67 @@ def register():
     email = data.get('email')
     password = generate_password_hash(data.get('password'))
 
+    # Limpeza dos números
     try:
-        # Extrai apenas os números (limpeza de segurança)
         bloco_num = int(''.join(filter(str.isdigit, str(data.get('bloco')))))
         ap_num = int(''.join(filter(str.isdigit, str(data.get('apartamento')))))
-    except (ValueError, TypeError):
-        return jsonify({'error': 'Bloco e Apartamento devem conter números.'}), 400
+    except:
+        return jsonify({'error': 'Dados de bloco/apto inválidos.'}), 400
 
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 1. Busca o ID do apartamento
-        cursor.execute('''
-            SELECT a.apartamento_id FROM apartamentos a 
-            JOIN blocos b ON a.bloco_id = b.bloco_id 
-            WHERE b.numero_bloco = %s AND a.numero_apartamento = %s
-        ''', (bloco_num, ap_num))
-        result = cursor.fetchone()
-        
-        if not result:
-            return jsonify({'error': f'Apartamento {ap_num} do Bloco {bloco_num} não existe.'}), 400
-        
-        ap_id = result['apartamento_id']
+        # 1. Busca o ID do apartamento (Tabelas em minúsculas)
+        cursor.execute('SELECT apartamento_id FROM apartamentos a JOIN blocos b ON a.bloco_id = b.bloco_id WHERE b.numero_bloco = %s AND a.numero_apartamento = %s', (bloco_num, ap_num))
+        res_ap = cursor.fetchone()
+        if not res_ap:
+            return jsonify({'error': 'Apartamento não encontrado.'}), 400
 
-        # 2. Insere o Morador
-        cursor.execute('''
-            INSERT INTO moradores (nome, email, password, role) 
-            VALUES (%s, %s, %s, 'morador') RETURNING morador_id
-        ''', (nome, email, password))
-        novo_morador_id = cursor.fetchone()['morador_id']
+        # 2. Cria o Morador
+        cursor.execute('INSERT INTO moradores (nome, email, password, role) VALUES (%s, %s, %s, "morador") RETURNING morador_id', (nome, email, password))
+        m_id = cursor.fetchone()['morador_id']
 
-        # 3. Cria o Vínculo (A Ponte)
-        cursor.execute('''
-            INSERT INTO morador_apartamentos (morador_id, apartamento_id) 
-            VALUES (%s, %s)
-        ''', (novo_morador_id, ap_id))
+        # 3. Cria o vínculo único
+        cursor.execute('INSERT INTO morador_apartamentos (morador_id, apartamento_id) VALUES (%s, %s)', (m_id, res_ap['apartamento_id']))
         
         conn.commit()
-        return jsonify({'message': 'Registo efetuado com sucesso!'}), 201
-    except psycopg2.IntegrityError:
-        return jsonify({'error': 'Este e-mail já está em uso.'}), 400
+        return jsonify({'message': 'Cadastrado com sucesso!'}), 201
     except Exception as e:
         if conn: conn.rollback()
-        return jsonify({'error': f'Falha no banco de dados: {str(e)}'}), 500
+        return jsonify({'error': f'Erro: {str(e)}'}), 500
     finally:
         if conn: conn.close()
 
-# --- ROTA DE LOGIN (Corrigida para a nova estrutura) ---
+
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM moradores WHERE email = %s', (email,))
+        cursor.execute('SELECT * FROM moradores WHERE email = %s', (data.get('email'),))
         user = cursor.fetchone()
 
-        if user and check_password_hash(user['password'], password):
-            # Busca os apartamentos ligados a este morador pela tabela 'ponte'
+        if user and check_password_hash(user['password'], data.get('password')):
+            # Busca apenas o primeiro apartamento encontrado
             cursor.execute('''
                 SELECT a.numero_apartamento, b.numero_bloco 
                 FROM morador_apartamentos ma
                 JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
                 JOIN blocos b ON a.bloco_id = b.bloco_id
-                WHERE ma.morador_id = %s
+                WHERE ma.morador_id = %s LIMIT 1
             ''', (user['morador_id'],))
             
             return jsonify({
                 'id': user['morador_id'],
                 'nome': user['nome'],
                 'role': user['role'],
-                'apartamentos': cursor.fetchall()
+                'apartamento': cursor.fetchone() # Retorna apenas um objeto, não uma lista
             }), 200
-        
-        return jsonify({'error': 'E-mail ou senha incorretos'}), 401
+        return jsonify({'error': 'Login inválido'}), 401
     finally:
         if conn: conn.close()
 
