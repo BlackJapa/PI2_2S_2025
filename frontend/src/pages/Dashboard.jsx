@@ -329,11 +329,43 @@ export default function Dashboard() {
         <div className="card p-4 shadow-sm">
           <h5 className="mb-4">Registrar Ocorrência</h5>
           <form onSubmit={handleSubmitComplaint}>
-            <input className="form-control mb-3" placeholder="Assunto" value={subject} onChange={(e) => setSubject(e.target.value)} required />
-            <textarea className="form-control mb-3" rows="4" placeholder="Descrição detalhada..." value={description} onChange={(e) => setDescription(e.target.value)} required></textarea>
-            <button className="btn btn-primary w-100" disabled={isSubmitting}>{isSubmitting ? "Enviando..." : "Enviar Reclamação"}</button>
-          </form>
-        </div>
+      
+            {/* NOVO: Menu de Seleção de Assuntos */}
+              <label className="form-label fw-bold">Assunto da Ocorrência</label>
+              <select 
+                className="form-select mb-3" 
+                value={subject} 
+                onChange={(e) => setSubject(e.target.value)} 
+                required
+              >
+                <option value="">Selecione um assunto...</option>
+                <option value="Barulho">Barulho / Perturbação</option>
+                <option value="Manutenção">Manutenção / Reparos</option>
+                <option value="Limpeza">Limpeza das Áreas Comuns</option>
+                <option value="Segurança">Segurança / Portaria</option>
+                <option value="Vaga de Garagem">Vaga de Garagem</option>
+                <option value="Convivência">Convivência / Vizinhos</option>
+                <option value="Outros">Outros (especificar na descrição)</option>
+              </select>
+
+              <label className="form-label fw-bold">Descrição Detalhada</label>
+              <textarea 
+                className="form-control mb-3" 
+                rows="4" 
+                placeholder="Descreva aqui o que aconteceu..." 
+                value={description} 
+                onChange={(e) => setDescription(e.target.value)} 
+                required
+              ></textarea>
+      
+              <button 
+                className="btn btn-primary w-100" 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Enviando..." : "Enviar Reclamação"}
+              </button>
+            </form>
+          </div>
       )}
 
       {/* Vista: Histórico */}
