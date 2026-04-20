@@ -33,22 +33,6 @@ export default function Dashboard() {
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
   
-  // Estado de usuário e funções auxiliares
-  const isAdmin = user?.role !== 'morador';
-  const getChartData = () => {
-    const counts = complaints.reduce((acc, complaint) => {
-      const key = complaint.subject || 'Outros';
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  };
-
-  useEffect(() => {
-    if (!user) { navigate("/"); return; }
-    fetchComplaints();
-  }, [user, navigate, fetchComplaints]);
-
   // --- Lógica para os Gráficos ---
   const getChartData = () => {
     const stats = {};
