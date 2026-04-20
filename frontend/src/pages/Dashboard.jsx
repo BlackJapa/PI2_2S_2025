@@ -310,10 +310,13 @@ export default function Dashboard() {
             <label className="form-label fw-bold">Assunto</label>
             <select className="form-select mb-3" value={subject} onChange={e => setSubject(e.target.value)} required>
               <option value="">Selecione...</option>
-              <option>Barulho</option>
-              <option>Manutenção</option>
-              <option>Limpeza</option>
-              <option>Outros</option>
+              <option value="Barulho">Barulho / Perturbação</option>
+              <option value="Manutenção">Manutenção / Reparos</option>
+              <option value="Limpeza">Limpeza das Áreas Comuns</option>
+              <option value="Segurança">Segurança / Portaria</option>
+              <option value="Vaga de Garagem">Vaga de Garagem</option>
+              <option value="Convivência">Convivência / Vizinhos</option>
+              <option value="Outros">Outros (especificar na descrição)</option>
             </select>
             <label className="form-label fw-bold">Descrição</label>
             <textarea className="form-control mb-3" rows="4" placeholder="Descreva o problema..." value={description} onChange={e => setDescription(e.target.value)} required />
