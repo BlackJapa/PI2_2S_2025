@@ -162,30 +162,63 @@ def link_apartment():
 
 
 # --- RECLAMAÇÕES ---
-@app.route('/api/complaints', methods=['GET'])
-def get_complaints():
-    user_id = request.args.get('user_id')
-    role = request.args.get('role')
+# --- Rota de Reclamações Atualizada (App.py) ---
+@app.route('/api/complaints', methods=['GET', 'POST'])
+def manage_complaints():
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        if role == 'morador':
+
+        if request.method == 'POST':
+            data = request.get_json()
             cursor.execute('''
-                SELECT c.*, m.nome as morador_nome
+                INSERT INTO complaints (user_id, subject, description, status) 
+                VALUES (%s, %s, %s, 'Pendente')
+            ''', (data.get('user_id'), data.get('subject'), data.get('description')))
+            conn.commit()
+            return jsonify({'message': 'Reclamação enviada!'}), 201
+
+        elif request.method == 'GET':
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            # SQL Mestre: Une reclamações com os dados de identificação do morador
+            query_admin = '''
+                SELECT c.*, m.nome as morador_nome, a.numero_apartamento, b.numero_bloco
                 FROM complaints c
                 JOIN moradores m ON c.user_id = m.morador_id
-                WHERE c.user_id = %s
-                ORDER BY c.created_at DESC
-            ''', (user_id,))
-        else:
-            cursor.execute('''
-                SELECT c.*, m.nome as morador_nome
-                FROM complaints c
-                JOIN moradores m ON c.user_id = m.morador_id
-                ORDER BY c.created_at DESC
-            ''')
-        return jsonify(cursor.fetchall()), 200
+                JOIN morador_apartamentos ma ON m.morador_id = ma.morador_id
+                JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
+                JOIN blocos b ON a.bloco_id = b.bloco_id
+            '''
+
+            if role == 'sindico':
+                # Síndico Geral: vê todas as reclamações do condomínio
+                cursor.execute(query_admin + ' ORDER BY c.id DESC')
+            
+            elif role == 'admin_bloco':
+                # Síndico de Bloco: vê apenas as reclamações do seu bloco específico
+                cursor.execute('''
+                    SELECT a.bloco_id FROM morador_apartamentos ma 
+                    JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id 
+                    WHERE ma.morador_id = %s LIMIT 1
+                ''', (user_id,))
+                res = cursor.fetchone()
+                if not res: return jsonify([]), 200
+                
+                cursor.execute(query_admin + ' WHERE a.bloco_id = %s ORDER BY c.id DESC', (res['bloco_id'],))
+            
+            else:
+                # Morador vê as dele + o seu nome (opcional, mas mantém o padrão do objeto)
+                cursor.execute('''
+                    SELECT c.*, m.nome as morador_nome 
+                    FROM complaints c 
+                    JOIN moradores m ON c.user_id = m.morador_id 
+                    WHERE c.user_id = %s ORDER BY c.id DESC
+                ''', (user_id,))
+            return jsonify(cursor.fetchall()), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:

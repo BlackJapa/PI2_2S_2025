@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Cell, PieChart, Pie 
+} from 'recharts';
+
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function Dashboard() {
@@ -27,7 +32,35 @@ export default function Dashboard() {
   // Estados de listas
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
+  
+  // Estado de usuário e funções auxiliares
+  const isAdmin = user?.role !== 'morador';
+  const getChartData = () => {
+    const counts = complaints.reduce((acc, complaint) => {
+      const key = complaint.subject || 'Outros';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  };
 
+  useEffect(() => {
+    if (!user) { navigate("/"); return; }
+    fetchComplaints();
+  }, [user, navigate, fetchComplaints]);
+
+  // --- Lógica para os Gráficos ---
+  const getChartData = () => {
+    const stats = {};
+    complaints.forEach(c => {
+      stats[c.subject] = (stats[c.subject] || 0) + 1;
+    });
+    return Object.entries(stats).map(([name, value]) => ({ name, value }));
+  };
+
+  const isAdmin = user?.role === 'sindico' || user?.role === 'admin_bloco';
+
+  
   // Estados para reclamações
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
@@ -368,44 +401,75 @@ export default function Dashboard() {
           </div>
       )}
 
-      {/* Vista: Histórico */}
+      {/* Histórico: Agora com dados do Morador para Admins */}
       {view === "visualizar" && (
-        <div className="table-responsive">
-          <table className="table table-hover shadow-sm bg-white rounded">
-            <thead className="table-light">
+        <div className="table-responsive card shadow-sm p-3">
+          <table className="table table-hover">
+            <thead>
               <tr>
-                <th>Data</th>
+                {isAdmin && <th>Morador / Local</th>}
                 <th>Assunto</th>
                 <th>Status</th>
-                <th>Ações</th>
+                <th>Data</th>
               </tr>
             </thead>
             <tbody>
-              {complaints.length > 0 ? complaints.map((c) => (
+              {complaints.map(c => (
                 <tr key={c.id}>
-                  <td>{new Date(c.created_at).toLocaleDateString('pt-BR')}</td>
+                  {isAdmin && (
+                    <td>
+                      <div className="fw-bold">{c.morador_nome || "N/A"}</div>
+                      <small className="text-muted">B{c.numero_bloco} - Ap{c.numero_apartamento}</small>
+                    </td>
+                  )}
                   <td>{c.subject}</td>
                   <td>
-                    <span className={`badge ${c.status === 'Resolvido' ? 'bg-success' : c.status === 'Em Análise' ? 'bg-info' : 'bg-warning text-dark'}`}>
+                    <span className={`badge ${c.status === 'Resolvido' ? 'bg-success' : 'bg-warning text-dark'}`}>
                       {c.status}
                     </span>
                   </td>
-                  <td>
-                    <button className="btn btn-sm btn-info text-white" onClick={() => {
-                      setSelectedComplaint(c);
-                      setNewStatus(c.status);
-                      setAdminComment(c.admin_comment || "");
-                      setShowModal(true);
-                    }}>Detalhes</button>
-                  </td>
+                  <td>{new Date(c.created_at).toLocaleDateString()}</td>
                 </tr>
-              )) : (
-                <tr><td colSpan="4" className="text-center py-4 text-muted">Nenhuma reclamação encontrada.</td></tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* ABA DE ANÁLISE: Com Gráficos Recharts */}
+      {view === "analise" && isAdmin && (
+        <div className="row">
+          <div className="col-12 mb-4">
+            <div className="card shadow-sm p-4">
+              <h5 className="mb-4">Volume de Ocorrências por Tipo</h5>
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <BarChart data={getChartData()}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip cursor={{fill: '#f8f9fa'}} />
+                    <Bar dataKey="value" radius={[5, 5, 0, 0]}>
+                      {getChartData().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#0d6efd' : '#198754'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+          
+          <div className="col-md-6 mb-4">
+            <div className="card shadow-sm p-4 text-center">
+              <h6>Total de Reclamações</h6>
+              <h1 className="display-3 fw-bold text-primary">{complaints.length}</h1>
+              <p className="text-muted">registadas no sistema</p>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Vista: Gestão (admin/síndico) */}
       {view === "admin" && (
