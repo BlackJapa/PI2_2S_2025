@@ -13,6 +13,7 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor, sslmode='require', connect_timeout=10)
 
+
 # --- CADASTRO ---
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -32,12 +33,10 @@ def register():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Verifica se e-mail já existe
         cursor.execute('SELECT morador_id FROM moradores WHERE email = %s', (email,))
         if cursor.fetchone():
             return jsonify({'error': 'E-mail já cadastrado.'}), 409
 
-        # Busca o apartamento
         cursor.execute('''
             SELECT a.apartamento_id FROM apartamentos a
             JOIN blocos b ON a.bloco_id = b.bloco_id
@@ -47,18 +46,15 @@ def register():
         if not res_ap:
             return jsonify({'error': 'Apartamento não encontrado.'}), 400
 
-        # Verifica se apartamento já tem morador vinculado
         cursor.execute('SELECT morador_id FROM morador_apartamentos WHERE apartamento_id = %s', (res_ap['apartamento_id'],))
         if cursor.fetchone():
             return jsonify({'error': 'Apartamento já possui morador cadastrado.'}), 409
 
-        # BUG CORRIGIDO: aspas simples em 'morador' (aspas duplas causavam erro no PostgreSQL)
         cursor.execute(
             "INSERT INTO moradores (nome, email, password, role) VALUES (%s, %s, %s, 'morador') RETURNING morador_id",
             (nome, email, password)
         )
         m_id = cursor.fetchone()['morador_id']
-
         cursor.execute('INSERT INTO morador_apartamentos (morador_id, apartamento_id) VALUES (%s, %s)', (m_id, res_ap['apartamento_id']))
 
         conn.commit()
@@ -70,7 +66,7 @@ def register():
         if conn: conn.close()
 
 
-# --- LOGIN (retorna TODOS os apartamentos do morador) ---
+# --- LOGIN ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -82,7 +78,6 @@ def login():
         user = cursor.fetchone()
 
         if user and check_password_hash(user['password'], data.get('password')):
-            # CORRIGIDO: retorna TODOS os apartamentos (sem LIMIT 1)
             cursor.execute('''
                 SELECT a.apartamento_id, a.numero_apartamento, b.numero_bloco, b.bloco_id
                 FROM morador_apartamentos ma
@@ -97,8 +92,8 @@ def login():
                 'id': user['morador_id'],
                 'nome': user['nome'],
                 'role': user['role'],
-                'apartamentos': apartamentos,                        # lista completa
-                'apartamento': apartamentos[0] if apartamentos else None  # ativo inicial
+                'apartamentos': apartamentos,
+                'apartamento': apartamentos[0] if apartamentos else None
             }), 200
 
         return jsonify({'error': 'E-mail ou senha incorretos.'}), 401
@@ -108,7 +103,7 @@ def login():
         if conn: conn.close()
 
 
-# --- VINCULAR NOVO APARTAMENTO (para proprietários) ---
+# --- VINCULAR NOVO APARTAMENTO ---
 @app.route('/api/apartments/link', methods=['POST'])
 def link_apartment():
     data = request.get_json()
@@ -133,7 +128,6 @@ def link_apartment():
         if not res_ap:
             return jsonify({'error': 'Apartamento não encontrado.'}), 404
 
-        # Verifica se o vínculo já existe para este morador
         cursor.execute(
             'SELECT 1 FROM morador_apartamentos WHERE morador_id = %s AND apartamento_id = %s',
             (morador_id, res_ap['apartamento_id'])
@@ -147,7 +141,6 @@ def link_apartment():
         )
         conn.commit()
 
-        # Retorna os dados do apartamento recém-vinculado
         cursor.execute('''
             SELECT a.apartamento_id, a.numero_apartamento, b.numero_bloco, b.bloco_id
             FROM apartamentos a JOIN blocos b ON a.bloco_id = b.bloco_id
@@ -161,8 +154,7 @@ def link_apartment():
         if conn: conn.close()
 
 
-# --- RECLAMAÇÕES ---
-# --- Rota de Reclamações Atualizada (App.py) ---
+# --- RECLAMAÇÕES (GET + POST numa rota só, sem duplicata) ---
 @app.route('/api/complaints', methods=['GET', 'POST'])
 def manage_complaints():
     conn = None
@@ -173,76 +165,56 @@ def manage_complaints():
         if request.method == 'POST':
             data = request.get_json()
             cursor.execute('''
-                INSERT INTO complaints (user_id, subject, description, status) 
-                VALUES (%s, %s, %s, 'Pendente')
+                INSERT INTO complaints (user_id, subject, description, status)
+                VALUES (%s, %s, %s, 'Pendente') RETURNING *
             ''', (data.get('user_id'), data.get('subject'), data.get('description')))
             conn.commit()
-            return jsonify({'message': 'Reclamação enviada!'}), 201
+            return jsonify(cursor.fetchone()), 201
 
-        elif request.method == 'GET':
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
+        # GET
+        user_id = request.args.get('user_id')
+        role = request.args.get('role')
 
-            # SQL Mestre: Une reclamações com os dados de identificação do morador
-            query_admin = '''
-                SELECT c.*, m.nome as morador_nome, a.numero_apartamento, b.numero_bloco
+        query_admin = '''
+            SELECT c.*, m.nome as morador_nome, a.numero_apartamento, b.numero_bloco
+            FROM complaints c
+            JOIN moradores m ON c.user_id = m.morador_id
+            JOIN morador_apartamentos ma ON m.morador_id = ma.morador_id
+            JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
+            JOIN blocos b ON a.bloco_id = b.bloco_id
+        '''
+
+        if role == 'sindico':
+            cursor.execute(query_admin + ' ORDER BY c.id DESC')
+
+        elif role == 'admin_bloco':
+            cursor.execute('''
+                SELECT a.bloco_id FROM morador_apartamentos ma
+                JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
+                WHERE ma.morador_id = %s LIMIT 1
+            ''', (user_id,))
+            res = cursor.fetchone()
+            if not res:
+                return jsonify([]), 200
+            cursor.execute(query_admin + ' WHERE b.bloco_id = %s ORDER BY c.id DESC', (res['bloco_id'],))
+
+        else:
+            cursor.execute('''
+                SELECT c.*, m.nome as morador_nome
                 FROM complaints c
                 JOIN moradores m ON c.user_id = m.morador_id
-                JOIN morador_apartamentos ma ON m.morador_id = ma.morador_id
-                JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
-                JOIN blocos b ON a.bloco_id = b.bloco_id
-            '''
+                WHERE c.user_id = %s ORDER BY c.id DESC
+            ''', (user_id,))
 
-            if role == 'sindico':
-                # Síndico Geral: vê todas as reclamações do condomínio
-                cursor.execute(query_admin + ' ORDER BY c.id DESC')
-            
-            elif role == 'admin_bloco':
-                # Síndico de Bloco: vê apenas as reclamações do seu bloco específico
-                cursor.execute('''
-                    SELECT a.bloco_id FROM morador_apartamentos ma 
-                    JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id 
-                    WHERE ma.morador_id = %s LIMIT 1
-                ''', (user_id,))
-                res = cursor.fetchone()
-                if not res: return jsonify([]), 200
-                
-                cursor.execute(query_admin + ' WHERE a.bloco_id = %s ORDER BY c.id DESC', (res['bloco_id'],))
-            
-            else:
-                # Morador vê as dele + o seu nome (opcional, mas mantém o padrão do objeto)
-                cursor.execute('''
-                    SELECT c.*, m.nome as morador_nome 
-                    FROM complaints c 
-                    JOIN moradores m ON c.user_id = m.morador_id 
-                    WHERE c.user_id = %s ORDER BY c.id DESC
-                ''', (user_id,))
-            return jsonify(cursor.fetchall()), 200
+        return jsonify(cursor.fetchall()), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         if conn: conn.close()
 
-@app.route('/api/complaints', methods=['POST'])
-def create_complaint():
-    data = request.get_json()
-    conn = None
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO complaints (user_id, subject, description, status)
-            VALUES (%s, %s, %s, 'Pendente') RETURNING *
-        ''', (data.get('user_id'), data.get('subject'), data.get('description')))
-        conn.commit()
-        return jsonify(cursor.fetchone()), 201
-    except Exception as e:
-        if conn: conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        if conn: conn.close()
 
+# --- ATUALIZAR RECLAMAÇÃO ---
 @app.route('/api/complaints/<int:complaint_id>', methods=['PUT'])
 def update_complaint(complaint_id):
     data = request.get_json()
@@ -280,8 +252,7 @@ def get_apts(num):
     cursor.execute('''
         SELECT a.numero_apartamento FROM apartamentos a
         JOIN blocos b ON a.bloco_id = b.bloco_id
-        WHERE b.numero_bloco = %s
-        ORDER BY a.numero_apartamento
+        WHERE b.numero_bloco = %s ORDER BY a.numero_apartamento
     ''', (num,))
     res = cursor.fetchall()
     conn.close()
@@ -297,7 +268,7 @@ def db_status():
         return jsonify({'status': 'offline'}), 500
 
 
-# --- LISTA DE USUÁRIOS (gestão admin) ---
+# --- LISTA DE USUÁRIOS ---
 @app.route('/api/users', methods=['GET'])
 def list_users():
     user_id = request.args.get('user_id')
@@ -323,7 +294,8 @@ def list_users():
                 WHERE ma.morador_id = %s LIMIT 1
             ''', (user_id,))
             res = cursor.fetchone()
-            if not res: return jsonify({'error': 'Admin sem bloco'}), 400
+            if not res:
+                return jsonify({'error': 'Admin sem bloco'}), 400
             cursor.execute(query_base + ' WHERE a.bloco_id = %s ORDER BY a.numero_apartamento', (res['bloco_id'],))
         else:
             return jsonify({'error': 'Acesso negado'}), 403
