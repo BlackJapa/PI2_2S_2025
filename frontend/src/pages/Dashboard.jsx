@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-// Bibliotecas de Gráficos
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend 
-} from 'recharts';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -30,7 +25,6 @@ export default function Dashboard() {
   // Estados para Novas Reclamações
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Estados para Gestão Administrativa (Modais)
   const [showModal, setShowModal] = useState(false);
@@ -38,7 +32,7 @@ export default function Dashboard() {
   const [newStatus, setNewStatus] = useState("");
   const [adminComment, setAdminComment] = useState("");
 
-  // --- LÓGICA DE PERMISSÕES (À PROVA DE ERROS) ---
+  // Lógica de Permissões
   const userRole = user?.role?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "";
   const isAdmin = userRole === 'sindico' || userRole === 'admin_bloco';
 
@@ -72,17 +66,15 @@ export default function Dashboard() {
     if (isAdmin) fetchUsers();
   }, [user, navigate, fetchComplaints, fetchUsers, isAdmin]);
 
-  // --- PROCESSAMENTO DE DADOS PARA GRÁFICOS ---
+  // --- PROCESSAMENTO DE DADOS PARA GRÁFICOS NATIVOS ---
   const getCategoryData = () => {
     const stats = {};
     complaints.forEach(c => { stats[c.subject] = (stats[c.subject] || 0) + 1; });
-    return Object.entries(stats).map(([name, value]) => ({ name, value }));
+    return Object.entries(stats).sort((a, b) => b[1] - a[1]); // Ordena do maior para o menor
   };
 
-  const getStatusData = () => {
-    const stats = {};
-    complaints.forEach(c => { stats[c.status] = (stats[c.status] || 0) + 1; });
-    return Object.entries(stats).map(([name, value]) => ({ name, value }));
+  const getStatusCount = (statusName) => {
+    return complaints.filter(c => c.status === statusName).length;
   };
 
   if (!user) return null;
@@ -141,7 +133,7 @@ export default function Dashboard() {
       {view === "registrar" && (
         <div className="card p-4 shadow-sm">
           <h5 className="mb-4">Registrar Ocorrência</h5>
-          <form onSubmit={(e) => { e.preventDefault(); /* sua lógica de post aqui */ }}>
+          <form onSubmit={(e) => { e.preventDefault(); /* Adicione seu fetch de POST aqui */ }}>
             <label className="form-label fw-bold">Assunto</label>
             <select className="form-select mb-3" value={subject} onChange={(e) => setSubject(e.target.value)} required>
               <option value="">Selecione...</option>
@@ -169,7 +161,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {complaints.map(c => (
+              {complaints.length > 0 ? complaints.map(c => (
                 <tr key={c.id}>
                   {isAdmin && (
                     <td>
@@ -186,60 +178,82 @@ export default function Dashboard() {
                     }}>Detalhes</button>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr><td colSpan="4" className="text-center py-3">Nenhum dado encontrado.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* VIEW: ANÁLISE DE DADOS (GRÁFICOS) */}
+      {/* VIEW: ANÁLISE DE DADOS (NATIVA SEM BIBLIOTECAS) */}
       {view === "analise" && isAdmin && (
         <div className="row">
-          {/* Gráfico de Barras - Categorias */}
+          
+          {/* Gráfico Nativo de Categorias */}
           <div className="col-lg-8 mb-4">
             <div className="card shadow-sm p-4 h-100 border-0">
-              <h5 className="mb-4">Ocorrências por Categoria</h5>
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <BarChart data={getCategoryData()}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip cursor={{fill: '#f8f9fa'}} />
-                    <Bar dataKey="value" radius={[5, 5, 0, 0]}>
-                      {getCategoryData().map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#0d6efd' : '#198754'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <h5 className="mb-4 text-primary">Ocorrências por Categoria</h5>
+              {complaints.length === 0 ? (
+                <p className="text-muted">Sem dados suficientes.</p>
+              ) : (
+                getCategoryData().map(([tipo, quantidade], index) => {
+                  const maxCount = Math.max(...getCategoryData().map(d => d[1]));
+                  const percent = (quantidade / maxCount) * 100;
+                  
+                  return (
+                    <div key={index} className="mb-3">
+                      <div className="d-flex justify-content-between mb-1">
+                        <span className="fw-bold">{tipo}</span>
+                        <span className="text-muted">{quantidade} registo(s)</span>
+                      </div>
+                      <div className="progress" style={{ height: '25px', borderRadius: '6px' }}>
+                        <div 
+                          className={`progress-bar ${index % 2 === 0 ? 'bg-primary' : 'bg-info'}`} 
+                          style={{ width: `${percent}%` }}
+                        >
+                          {quantidade}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
-          {/* Gráfico de Pizza - Status */}
+          {/* Resumo de Status Nativo */}
           <div className="col-lg-4 mb-4">
-            <div className="card shadow-sm p-4 h-100 border-0">
-              <h5 className="mb-4">Status Geral</h5>
-              <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={getStatusData()} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                      <Cell fill="#198754" />
-                      <Cell fill="#ffc107" />
-                      <Cell fill="#dc3545" />
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+            <div className="card shadow-sm p-4 h-100 border-0 bg-light">
+              <h5 className="mb-4 text-dark">Status Geral</h5>
+              
+              <div className="card border-warning mb-3">
+                <div className="card-body d-flex justify-content-between align-items-center">
+                  <span className="fw-bold text-warning">Pendentes</span>
+                  <span className="badge bg-warning text-dark fs-5">{getStatusCount('Pendente')}</span>
+                </div>
               </div>
+
+              <div className="card border-info mb-3">
+                <div className="card-body d-flex justify-content-between align-items-center">
+                  <span className="fw-bold text-info">Em Análise</span>
+                  <span className="badge bg-info text-white fs-5">{getStatusCount('Em Análise')}</span>
+                </div>
+              </div>
+
+              <div className="card border-success">
+                <div className="card-body d-flex justify-content-between align-items-center">
+                  <span className="fw-bold text-success">Resolvidos</span>
+                  <span className="badge bg-success fs-5">{getStatusCount('Resolvido')}</span>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL DE DETALHES (Preservado) */}
+      {/* MODAL DE DETALHES (Com restrição de comentários para admins) */}
       {showModal && selectedComplaint && (
         <div className="modal show d-block" style={{backgroundColor: 'rgba(0,0,0,0.5)'}}>
           <div className="modal-dialog">
@@ -251,20 +265,29 @@ export default function Dashboard() {
               <div className="modal-body">
                 <p><strong>Assunto:</strong> {selectedComplaint.subject}</p>
                 <p><strong>Descrição:</strong> {selectedComplaint.description}</p>
-                {isAdmin && (
-                   <div className="mt-3">
+                
+                {/* Apenas administradores podem alterar o status e comentar */}
+                {isAdmin ? (
+                   <div className="mt-3 bg-light p-3 rounded">
                      <label className="form-label fw-bold">Atualizar Status</label>
                      <select className="form-select mb-3" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
                         <option value="Pendente">Pendente</option>
                         <option value="Em Análise">Em Análise</option>
                         <option value="Resolvido">Resolvido</option>
                      </select>
+                     <label className="form-label fw-bold">Comentário do Síndico</label>
+                     <textarea className="form-control" rows="2" value={adminComment} onChange={(e) => setAdminComment(e.target.value)}></textarea>
                    </div>
+                ) : (
+                  <div className="mt-3 bg-light p-3 rounded">
+                    <p><strong>Status Atual:</strong> <span className="badge bg-primary">{selectedComplaint.status}</span></p>
+                    <p className="mb-0"><strong>Resposta do Síndico:</strong> {selectedComplaint.admin_comment || "Nenhuma resposta ainda."}</p>
+                  </div>
                 )}
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Fechar</button>
-                {isAdmin && <button className="btn btn-primary">Salvar</button>}
+                {isAdmin && <button className="btn btn-success">Salvar</button>}
               </div>
             </div>
           </div>
