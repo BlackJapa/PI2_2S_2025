@@ -139,7 +139,74 @@ def change_password(morador_id):
         if conn: conn.close()
 
 
-# --- EXCLUIR MORADOR (apenas síndico e admin_bloco) ---
+# --- ALTERAR CARGO (apenas síndico geral) ---
+@app.route('/api/moradores/<int:morador_id>/role', methods=['PUT'])
+def change_role(morador_id):
+    data = request.get_json()
+    requester_role = data.get('requester_role')
+    requester_id = data.get('requester_id')
+    new_role = data.get('new_role')
+
+    if requester_role != 'sindico':
+        return jsonify({'error': 'Apenas o Síndico Geral pode alterar cargos.'}), 403
+
+    allowed_roles = ('morador', 'admin_bloco', 'sindico')
+    if new_role not in allowed_roles:
+        return jsonify({'error': 'Cargo inválido.'}), 400
+
+    if str(morador_id) == str(requester_id):
+        return jsonify({'error': 'Você não pode alterar o seu próprio cargo.'}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT morador_id, role FROM moradores WHERE morador_id = %s', (morador_id,))
+        target = cursor.fetchone()
+        if not target:
+            return jsonify({'error': 'Morador não encontrado.'}), 404
+
+        # Regra: só 1 admin_bloco por bloco
+        if new_role == 'admin_bloco':
+            # Descobre o bloco do morador-alvo
+            cursor.execute('''
+                SELECT b.bloco_id, b.numero_bloco FROM morador_apartamentos ma
+                JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
+                JOIN blocos b ON a.bloco_id = b.bloco_id
+                WHERE ma.morador_id = %s LIMIT 1
+            ''', (morador_id,))
+            bloco_target = cursor.fetchone()
+
+            if not bloco_target:
+                return jsonify({'error': 'Este morador não possui apartamento vinculado.'}), 400
+
+            # Verifica se o bloco já tem um admin_bloco diferente
+            cursor.execute('''
+                SELECT m.morador_id, m.nome FROM moradores m
+                JOIN morador_apartamentos ma ON m.morador_id = ma.morador_id
+                JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
+                WHERE a.bloco_id = %s AND m.role = 'admin_bloco' AND m.morador_id != %s
+                LIMIT 1
+            ''', (bloco_target['bloco_id'], morador_id))
+            existing_admin = cursor.fetchone()
+
+            if existing_admin:
+                return jsonify({
+                    'error': f"O Bloco {bloco_target['numero_bloco']} já possui um Síndico de Bloco ({existing_admin['nome']}). Remova o cargo dele antes de atribuir a outro morador."
+                }), 409
+
+        cursor.execute('UPDATE moradores SET role = %s WHERE morador_id = %s', (new_role, morador_id))
+        conn.commit()
+        return jsonify({'message': f'Cargo atualizado para "{new_role}" com sucesso.'}), 200
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn: conn.close()
+
+
+# --- EXCLUIR MORADOR ---
 @app.route('/api/moradores/<int:morador_id>', methods=['DELETE'])
 def delete_morador(morador_id):
     requester_id = request.args.get('requester_id')
@@ -153,11 +220,9 @@ def delete_morador(morador_id):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Impede auto-exclusão
         if str(morador_id) == str(requester_id):
             return jsonify({'error': 'Você não pode excluir a sua própria conta por aqui.'}), 400
 
-        # admin_bloco só pode excluir moradores do seu bloco
         if requester_role == 'admin_bloco':
             cursor.execute('''
                 SELECT b.bloco_id FROM morador_apartamentos ma
@@ -188,9 +253,7 @@ def delete_morador(morador_id):
         if conn: conn.close()
 
 
-# --- SOLICITAÇÕES DE VÍNCULO DE APARTAMENTO ---
-
-# Morador cria uma solicitação
+# --- SOLICITAÇÕES DE VÍNCULO ---
 @app.route('/api/apartments/request', methods=['POST'])
 def request_apartment():
     data = request.get_json()
@@ -217,15 +280,10 @@ def request_apartment():
 
         apt_id = res_ap['apartamento_id']
 
-        # Verifica se já tem vínculo direto
-        cursor.execute(
-            'SELECT 1 FROM morador_apartamentos WHERE morador_id = %s AND apartamento_id = %s',
-            (morador_id, apt_id)
-        )
+        cursor.execute('SELECT 1 FROM morador_apartamentos WHERE morador_id = %s AND apartamento_id = %s', (morador_id, apt_id))
         if cursor.fetchone():
             return jsonify({'error': 'Você já possui vínculo com este apartamento.'}), 409
 
-        # Verifica se já existe solicitação pendente para o mesmo apartamento
         cursor.execute('''
             SELECT 1 FROM apartment_requests
             WHERE morador_id = %s AND apartamento_id = %s AND status = 'Pendente'
@@ -246,7 +304,6 @@ def request_apartment():
         if conn: conn.close()
 
 
-# Morador consulta suas próprias solicitações
 @app.route('/api/apartments/requests/me', methods=['GET'])
 def get_my_requests():
     morador_id = request.args.get('morador_id')
@@ -270,7 +327,6 @@ def get_my_requests():
         if conn: conn.close()
 
 
-# Síndico lista solicitações pendentes (do seu bloco ou de todo o condomínio)
 @app.route('/api/apartments/requests', methods=['GET'])
 def get_requests():
     requester_id = request.args.get('user_id')
@@ -298,7 +354,6 @@ def get_requests():
         if role == 'sindico':
             cursor.execute(query + ' ORDER BY r.created_at DESC')
         else:
-            # admin_bloco: apenas solicitações do seu bloco
             cursor.execute('''
                 SELECT a.bloco_id FROM morador_apartamentos ma
                 JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
@@ -316,11 +371,10 @@ def get_requests():
         if conn: conn.close()
 
 
-# Síndico aprova ou nega
 @app.route('/api/apartments/requests/<int:request_id>', methods=['PUT'])
 def handle_request(request_id):
     data = request.get_json()
-    action = data.get('action')  # 'Aprovado' ou 'Negado'
+    action = data.get('action')
     requester_role = data.get('role')
 
     if requester_role not in ('sindico', 'admin_bloco'):
@@ -341,7 +395,6 @@ def handle_request(request_id):
         cursor.execute('UPDATE apartment_requests SET status = %s WHERE request_id = %s', (action, request_id))
 
         if action == 'Aprovado':
-            # Verifica se já não tem vínculo antes de inserir
             cursor.execute(
                 'SELECT 1 FROM morador_apartamentos WHERE morador_id = %s AND apartamento_id = %s',
                 (req['morador_id'], req['apartamento_id'])
@@ -362,6 +415,8 @@ def handle_request(request_id):
 
 
 # --- RECLAMAÇÕES ---
+# FIX: POST agora salva o apartamento_id ativo do morador.
+# FIX: GET usa DISTINCT ON para evitar duplicatas quando morador tem múltiplos aptos.
 @app.route('/api/complaints', methods=['GET', 'POST'])
 def manage_complaints():
     conn = None
@@ -371,27 +426,38 @@ def manage_complaints():
 
         if request.method == 'POST':
             data = request.get_json()
+            # apartamento_id é enviado pelo frontend (apartamento ativo no momento)
             cursor.execute('''
-                INSERT INTO complaints (user_id, subject, description, status)
-                VALUES (%s, %s, %s, 'Pendente') RETURNING *
-            ''', (data.get('user_id'), data.get('subject'), data.get('description')))
+                INSERT INTO complaints (user_id, apartamento_id, subject, description, status)
+                VALUES (%s, %s, %s, %s, 'Pendente') RETURNING *
+            ''', (data.get('user_id'), data.get('apartamento_id'), data.get('subject'), data.get('description')))
             conn.commit()
             return jsonify(cursor.fetchone()), 201
 
         user_id = request.args.get('user_id')
         role = request.args.get('role')
 
+        # FIX: JOIN direto pelo apartamento_id da reclamação + DISTINCT ON para eliminar duplicatas
+        # Para reclamações antigas (apartamento_id NULL), faz fallback via morador_apartamentos
         query_admin = '''
-            SELECT c.*, m.nome as morador_nome, a.numero_apartamento, b.numero_bloco
+            SELECT DISTINCT ON (c.id)
+                c.*,
+                m.nome as morador_nome,
+                COALESCE(a_direct.numero_apartamento, a_fallback.numero_apartamento) as numero_apartamento,
+                COALESCE(b_direct.numero_bloco,       b_fallback.numero_bloco)       as numero_bloco,
+                COALESCE(b_direct.bloco_id,           b_fallback.bloco_id)           as bloco_id
             FROM complaints c
             JOIN moradores m ON c.user_id = m.morador_id
-            JOIN morador_apartamentos ma ON m.morador_id = ma.morador_id
-            JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
-            JOIN blocos b ON a.bloco_id = b.bloco_id
+            LEFT JOIN apartamentos  a_direct   ON c.apartamento_id = a_direct.apartamento_id
+            LEFT JOIN blocos        b_direct   ON a_direct.bloco_id = b_direct.bloco_id
+            LEFT JOIN morador_apartamentos ma  ON m.morador_id = ma.morador_id
+            LEFT JOIN apartamentos  a_fallback ON ma.apartamento_id = a_fallback.apartamento_id
+            LEFT JOIN blocos        b_fallback ON a_fallback.bloco_id = b_fallback.bloco_id
         '''
 
         if role == 'sindico':
             cursor.execute(query_admin + ' ORDER BY c.id DESC')
+
         elif role == 'admin_bloco':
             cursor.execute('''
                 SELECT a.bloco_id FROM morador_apartamentos ma
@@ -401,13 +467,21 @@ def manage_complaints():
             res = cursor.fetchone()
             if not res:
                 return jsonify([]), 200
-            cursor.execute(query_admin + ' WHERE b.bloco_id = %s ORDER BY c.id DESC', (res['bloco_id'],))
+            # Filtra pelo bloco da reclamação (direto ou fallback)
+            cursor.execute(query_admin + '''
+                ORDER BY c.id DESC
+            ''')
+            # Filtra em Python para garantir compatibilidade com NULL
+            all_rows = cursor.fetchall()
+            return jsonify([r for r in all_rows if r.get('bloco_id') == res['bloco_id']]), 200
+
         else:
+            # Morador: só as próprias reclamações, sem duplicata
             cursor.execute('''
-                SELECT c.*, m.nome as morador_nome
+                SELECT DISTINCT ON (c.id) c.*
                 FROM complaints c
-                JOIN moradores m ON c.user_id = m.morador_id
-                WHERE c.user_id = %s ORDER BY c.id DESC
+                WHERE c.user_id = %s
+                ORDER BY c.id DESC
             ''', (user_id,))
 
         return jsonify(cursor.fetchall()), 200
@@ -471,6 +545,7 @@ def db_status():
 
 
 # --- LISTA DE USUÁRIOS ---
+# FIX: DISTINCT ON para evitar duplicatas de moradores com múltiplos aptos
 @app.route('/api/users', methods=['GET'])
 def list_users():
     user_id = request.args.get('user_id')
@@ -479,16 +554,18 @@ def list_users():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        # DISTINCT ON (m.morador_id) — pega apenas 1 linha por morador
         query_base = '''
-            SELECT m.morador_id, m.nome, m.email, m.role,
-                   a.numero_apartamento, b.numero_bloco
+            SELECT DISTINCT ON (m.morador_id)
+                   m.morador_id, m.nome, m.email, m.role,
+                   a.numero_apartamento, b.numero_bloco, b.bloco_id
             FROM moradores m
             LEFT JOIN morador_apartamentos ma ON m.morador_id = ma.morador_id
             LEFT JOIN apartamentos a ON ma.apartamento_id = a.apartamento_id
             LEFT JOIN blocos b ON a.bloco_id = b.bloco_id
         '''
         if role == 'sindico':
-            cursor.execute(query_base + ' ORDER BY b.numero_bloco, a.numero_apartamento')
+            cursor.execute(query_base + ' ORDER BY m.morador_id, b.numero_bloco, a.numero_apartamento')
         elif role == 'admin_bloco':
             cursor.execute('''
                 SELECT a.bloco_id FROM morador_apartamentos ma
@@ -498,7 +575,10 @@ def list_users():
             res = cursor.fetchone()
             if not res:
                 return jsonify({'error': 'Admin sem bloco'}), 400
-            cursor.execute(query_base + ' WHERE a.bloco_id = %s ORDER BY a.numero_apartamento', (res['bloco_id'],))
+            cursor.execute(
+                query_base + ' WHERE a.bloco_id = %s ORDER BY m.morador_id, a.numero_apartamento',
+                (res['bloco_id'],)
+            )
         else:
             return jsonify({'error': 'Acesso negado'}), 403
         return jsonify(cursor.fetchall()), 200

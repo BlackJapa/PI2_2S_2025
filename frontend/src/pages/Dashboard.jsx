@@ -10,21 +10,16 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 const STATUS_COLORS = { "Pendente": "#f59e0b", "Em Análise": "#3b82f6", "Resolvido": "#10b981" };
 const BAR_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd"];
 
+const ROLE_LABELS = { morador: "Morador", admin_bloco: "Sínd. Bloco", sindico: "Síndico Geral" };
+const ROLE_BADGE  = { morador: "bg-secondary", admin_bloco: "bg-info text-dark", sindico: "bg-primary" };
+
 // --- EXPORTAÇÃO ---
-const exportToExcel = (complaints, isAdmin) => {
+const exportToExcel = (rows) => {
   import('xlsx').then(XLSX => {
-    const rows = complaints.map(c => ({
-      ...(isAdmin ? { Morador: c.morador_nome, Bloco: c.numero_bloco, Apartamento: c.numero_apartamento } : {}),
-      Assunto: c.subject,
-      Descrição: c.description,
-      Status: c.status,
-      'Resposta do Síndico': c.admin_comment || '',
-      Data: new Date(c.created_at).toLocaleDateString('pt-BR'),
-    }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Ocorrências');
-    XLSX.writeFile(wb, 'ocorrencias.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+    XLSX.writeFile(wb, 'exportacao.xlsx');
   });
 };
 
@@ -36,16 +31,13 @@ const exportToPDF = (complaints, isAdmin) => {
       doc.text('Relatório de Ocorrências', 14, 18);
       doc.setFontSize(10);
       doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
-
       const head = isAdmin
         ? [['Morador', 'Bloco', 'Apto', 'Assunto', 'Status', 'Data']]
         : [['Assunto', 'Status', 'Resposta', 'Data']];
-
       const body = complaints.map(c => isAdmin
         ? [c.morador_nome, c.numero_bloco, c.numero_apartamento, c.subject, c.status, new Date(c.created_at).toLocaleDateString('pt-BR')]
         : [c.subject, c.status, c.admin_comment || '—', new Date(c.created_at).toLocaleDateString('pt-BR')]
       );
-
       doc.autoTable({ head, body, startY: 32, styles: { fontSize: 9 }, headStyles: { fillColor: [99, 102, 241] } });
       doc.save('ocorrencias.pdf');
     });
@@ -81,22 +73,18 @@ export default function Dashboard() {
     return u?.apartamento || u?.apartamentos?.[0] || null;
   });
 
-  // Listas principais
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
 
-  // Reclamação
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Modal de detalhes
   const [showModal, setShowModal] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [adminComment, setAdminComment] = useState("");
 
-  // Solicitação de apartamento (morador)
   const [blocks, setBlocks] = useState([]);
   const [reqBloco, setReqBloco] = useState("");
   const [reqApartamento, setReqApartamento] = useState("");
@@ -105,10 +93,13 @@ export default function Dashboard() {
   const [isSendingReq, setIsSendingReq] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
 
-  // Solicitações pendentes (síndico)
   const [pendingRequests, setPendingRequests] = useState([]);
 
-  // Configurações de perfil
+  // Alterar cargo
+  const [changingRoleId, setChangingRoleId] = useState(null);
+  const [roleMsg, setRoleMsg] = useState({ id: null, type: "", text: "" });
+
+  // Configurações
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -116,12 +107,18 @@ export default function Dashboard() {
   const [isSavingPass, setIsSavingPass] = useState(false);
 
   const userRole = user?.role?.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || "";
-  const isAdmin = userRole === "sindico" || userRole === "admin_bloco";
+  const isAdmin   = userRole === "sindico" || userRole === "admin_bloco";
+  const isSindico = userRole === "sindico";
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    navigate("/");
-  };
+  // Mapa bloco_id → nome do admin_bloco já existente (calculado dos users carregados)
+  const adminBlocoMap = users.reduce((acc, u) => {
+    if (u.role === "admin_bloco" && u.bloco_id) {
+      acc[u.bloco_id] = u.nome;
+    }
+    return acc;
+  }, {});
+
+  const handleLogout = () => { localStorage.removeItem("user"); navigate("/"); };
 
   const handleSwitchApt = (apt) => {
     setActiveApt(apt);
@@ -134,7 +131,7 @@ export default function Dashboard() {
   const fetchComplaints = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await fetch(`${API_URL}/api/complaints?user_id=${user.id}&role=${user.role}`);
+      const res  = await fetch(`${API_URL}/api/complaints?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
       if (Array.isArray(data)) setComplaints(data);
     } catch (err) { console.error(err); }
@@ -143,7 +140,7 @@ export default function Dashboard() {
   const fetchUsers = useCallback(async () => {
     if (!isAdmin) return;
     try {
-      const res = await fetch(`${API_URL}/api/users?user_id=${user.id}&role=${user.role}`);
+      const res  = await fetch(`${API_URL}/api/users?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
       if (Array.isArray(data)) setUsers(data);
     } catch (err) { console.error(err); }
@@ -152,7 +149,7 @@ export default function Dashboard() {
   const fetchPendingRequests = useCallback(async () => {
     if (!isAdmin) return;
     try {
-      const res = await fetch(`${API_URL}/api/apartments/requests?user_id=${user.id}&role=${user.role}`);
+      const res  = await fetch(`${API_URL}/api/apartments/requests?user_id=${user.id}&role=${user.role}`);
       const data = await res.json();
       if (Array.isArray(data)) setPendingRequests(data);
     } catch (err) { console.error(err); }
@@ -161,7 +158,7 @@ export default function Dashboard() {
   const fetchMyRequests = useCallback(async () => {
     if (!user) return;
     try {
-      const res = await fetch(`${API_URL}/api/apartments/requests/me?morador_id=${user.id}`);
+      const res  = await fetch(`${API_URL}/api/apartments/requests/me?morador_id=${user.id}`);
       const data = await res.json();
       if (Array.isArray(data)) setMyRequests(data);
     } catch (err) { console.error(err); }
@@ -174,42 +171,42 @@ export default function Dashboard() {
     fetchMyRequests();
   }, [user, navigate, fetchComplaints, fetchUsers, fetchPendingRequests, fetchMyRequests, isAdmin]);
 
-  // Carrega blocos para solicitação de apartamento
   useEffect(() => {
     if (view === "meus_apts" && blocks.length === 0) {
-      fetch(`${API_URL}/api/blocks`)
-        .then(r => r.json())
-        .then(d => { if (Array.isArray(d)) setBlocks(d); })
-        .catch(() => {});
+      fetch(`${API_URL}/api/blocks`).then(r => r.json()).then(d => { if (Array.isArray(d)) setBlocks(d); }).catch(() => {});
     }
   }, [view]);
 
   useEffect(() => {
     if (reqBloco) {
       setReqApartamento("");
-      fetch(`${API_URL}/api/blocks/${reqBloco}/apartments`)
-        .then(r => r.json())
-        .then(d => { if (Array.isArray(d)) setReqAvailableApts(d); })
-        .catch(() => setReqAvailableApts([]));
-    } else {
-      setReqAvailableApts([]);
-    }
+      fetch(`${API_URL}/api/blocks/${reqBloco}/apartments`).then(r => r.json()).then(d => { if (Array.isArray(d)) setReqAvailableApts(d); }).catch(() => setReqAvailableApts([]));
+    } else { setReqAvailableApts([]); }
   }, [reqBloco]);
 
   // --- AÇÕES ---
+
+  // FIX: inclui apartamento_id ativo para evitar duplicação no backend
   const handleSubmitComplaint = async (e) => {
     e.preventDefault();
+    if (!activeApt?.apartamento_id) {
+      alert("Selecione um apartamento ativo antes de registrar uma ocorrência.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/api/complaints`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: user.id, subject, description })
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          apartamento_id: activeApt.apartamento_id,  // ← FIX
+          subject,
+          description
+        })
       });
       if (res.ok) {
         alert("Reclamação enviada!");
-        setSubject("");
-        setDescription("");
+        setSubject(""); setDescription("");
         setView("visualizar");
         fetchComplaints();
       }
@@ -220,8 +217,7 @@ export default function Dashboard() {
   const handleUpdateStatus = async () => {
     try {
       const res = await fetch(`${API_URL}/api/complaints/${selectedComplaint.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus, admin_comment: adminComment })
       });
       if (res.ok) { setShowModal(false); fetchComplaints(); }
@@ -233,102 +229,106 @@ export default function Dashboard() {
     setIsSendingReq(true);
     setReqMsg({ type: "", text: "" });
     try {
-      const res = await fetch(`${API_URL}/api/apartments/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res  = await fetch(`${API_URL}/api/apartments/request`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ morador_id: user.id, bloco: reqBloco, apartamento: reqApartamento })
       });
       const data = await res.json();
-      if (res.ok) {
-        setReqMsg({ type: "success", text: data.message });
-        setReqBloco("");
-        setReqApartamento("");
-        fetchMyRequests();
-      } else {
-        setReqMsg({ type: "error", text: data.error });
-      }
+      if (res.ok) { setReqMsg({ type: "success", text: data.message }); setReqBloco(""); setReqApartamento(""); fetchMyRequests(); }
+      else { setReqMsg({ type: "error", text: data.error }); }
     } catch { setReqMsg({ type: "error", text: "Erro de conexão." }); }
     finally { setIsSendingReq(false); }
   };
 
   const handleRequestAction = async (requestId, action) => {
     try {
-      const res = await fetch(`${API_URL}/api/apartments/requests/${requestId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const res  = await fetch(`${API_URL}/api/apartments/requests/${requestId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, role: user.role })
       });
       const data = await res.json();
-      if (res.ok) {
-        fetchPendingRequests();
-        fetchUsers();
-      } else {
-        alert(data.error);
-      }
+      if (res.ok) { fetchPendingRequests(); fetchUsers(); }
+      else { alert(data.error); }
     } catch { alert("Erro ao processar."); }
   };
 
   const handleDeleteUser = async (moradorId, nome) => {
     if (!window.confirm(`Confirmar exclusão de "${nome}"? Esta ação não pode ser desfeita.`)) return;
     try {
-      const res = await fetch(`${API_URL}/api/moradores/${moradorId}?requester_id=${user.id}&role=${user.role}`, {
-        method: "DELETE"
+      const res  = await fetch(`${API_URL}/api/moradores/${moradorId}?requester_id=${user.id}&role=${user.role}`, { method: "DELETE" });
+      const data = await res.json();
+      if (res.ok) { fetchUsers(); } else { alert(data.error); }
+    } catch { alert("Erro ao excluir."); }
+  };
+
+  // FIX: alterar cargo com validação de 1 síndico por bloco
+  const handleChangeRole = async (moradorId, newRole, moradorBloco) => {
+    // Avisa antes de atribuir admin_bloco se já existe um no bloco
+    if (newRole === "admin_bloco" && moradorBloco && adminBlocoMap[moradorBloco]) {
+      const existingName = adminBlocoMap[moradorBloco];
+      const confirmed = window.confirm(
+        `O Bloco ${moradorBloco} já tem "${existingName}" como Síndico de Bloco.\n\nSe continuar, o backend irá rejeitar a operação. Remova o cargo de "${existingName}" antes.\n\nDeseja tentar mesmo assim?`
+      );
+      if (!confirmed) return;
+    }
+
+    setChangingRoleId(moradorId);
+    setRoleMsg({ id: moradorId, type: "", text: "" });
+    try {
+      const res  = await fetch(`${API_URL}/api/moradores/${moradorId}/role`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requester_role: user.role, requester_id: user.id, new_role: newRole })
       });
       const data = await res.json();
       if (res.ok) {
-        fetchUsers();
+        setRoleMsg({ id: moradorId, type: "success", text: `✓ Cargo alterado para "${ROLE_LABELS[newRole]}"` });
+        setUsers(prev => prev.map(u => u.morador_id === moradorId ? { ...u, role: newRole } : u));
+        setTimeout(() => setRoleMsg({ id: null, type: "", text: "" }), 2500);
       } else {
-        alert(data.error);
+        setRoleMsg({ id: moradorId, type: "error", text: data.error });
+        // Reverte o select visualmente re-fetching
+        fetchUsers();
+        setTimeout(() => setRoleMsg({ id: null, type: "", text: "" }), 4000);
       }
-    } catch { alert("Erro ao excluir."); }
+    } catch {
+      setRoleMsg({ id: moradorId, type: "error", text: "Erro de conexão." });
+    } finally {
+      setChangingRoleId(null);
+    }
   };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setSenhaMsg({ type: "", text: "" });
-    if (novaSenha !== confirmarSenha) {
-      setSenhaMsg({ type: "error", text: "As senhas não coincidem." });
-      return;
-    }
+    if (novaSenha !== confirmarSenha) { setSenhaMsg({ type: "error", text: "As senhas não coincidem." }); return; }
     setIsSavingPass(true);
     try {
-      const res = await fetch(`${API_URL}/api/moradores/${user.id}/senha`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const res  = await fetch(`${API_URL}/api/moradores/${user.id}/senha`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ senha_atual: senhaAtual, nova_senha: novaSenha })
       });
       const data = await res.json();
-      if (res.ok) {
-        setSenhaMsg({ type: "success", text: "Senha alterada com sucesso!" });
-        setSenhaAtual("");
-        setNovaSenha("");
-        setConfirmarSenha("");
-      } else {
-        setSenhaMsg({ type: "error", text: data.error });
-      }
+      if (res.ok) { setSenhaMsg({ type: "success", text: "Senha alterada com sucesso!" }); setSenhaAtual(""); setNovaSenha(""); setConfirmarSenha(""); }
+      else { setSenhaMsg({ type: "error", text: data.error }); }
     } catch { setSenhaMsg({ type: "error", text: "Erro de conexão." }); }
     finally { setIsSavingPass(false); }
   };
 
-  // --- DADOS RECHARTS ---
+  // --- RECHARTS ---
   const categoryData = Object.entries(
     complaints.reduce((acc, c) => { acc[c.subject] = (acc[c.subject] || 0) + 1; return acc; }, {})
   ).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 
-  const statusData = ["Pendente", "Em Análise", "Resolvido"].map(s => ({
-    name: s, value: complaints.filter(c => c.status === s).length
-  }));
+  const statusData   = ["Pendente", "Em Análise", "Resolvido"].map(s => ({ name: s, value: complaints.filter(c => c.status === s).length }));
 
-  const monthlyData = complaints.reduce((acc, c) => {
+  const monthlyData  = complaints.reduce((acc, c) => {
     const month = new Date(c.created_at).toLocaleString("pt-BR", { month: "short", year: "2-digit" });
     const existing = acc.find(a => a.mes === month);
-    if (existing) existing.total++;
-    else acc.push({ mes: month, total: 1 });
+    if (existing) existing.total++; else acc.push({ mes: month, total: 1 });
     return acc;
   }, []);
 
   if (!user) return null;
-
   const apartamentos = user.apartamentos || (user.apartamento ? [user.apartamento] : []);
 
   return (
@@ -339,32 +339,20 @@ export default function Dashboard() {
         <div className="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
           <div>
             <h4 className="mb-1 text-primary">Bem-vindo, {user.nome}</h4>
-            {activeApt ? (
-              <p className="mb-0 text-muted small">Bloco {activeApt.numero_bloco} — Apto {activeApt.numero_apartamento}</p>
-            ) : (
-              <p className="mb-0 text-danger small">Nenhum apartamento vinculado.</p>
-            )}
-            <span className="badge bg-dark mt-1">{user.role}</span>
+            {activeApt
+              ? <p className="mb-0 text-muted small">Bloco {activeApt.numero_bloco} — Apto {activeApt.numero_apartamento}</p>
+              : <p className="mb-0 text-danger small">Nenhum apartamento vinculado.</p>
+            }
+            <span className="badge bg-dark mt-1">{ROLE_LABELS[user.role] || user.role}</span>
             {isAdmin && pendingRequests.length > 0 && (
               <span className="badge bg-danger ms-2">{pendingRequests.length} solicitação(ões) pendente(s)</span>
             )}
           </div>
           <div className="d-flex gap-2 align-items-center flex-wrap">
             {apartamentos.length > 1 && (
-              <select
-                className="form-select form-select-sm"
-                style={{ width: "auto" }}
-                value={activeApt?.apartamento_id || ""}
-                onChange={(e) => {
-                  const apt = apartamentos.find(a => String(a.apartamento_id) === e.target.value);
-                  if (apt) handleSwitchApt(apt);
-                }}
-              >
-                {apartamentos.map(a => (
-                  <option key={a.apartamento_id} value={a.apartamento_id}>
-                    Bloco {a.numero_bloco} — Apto {a.numero_apartamento}
-                  </option>
-                ))}
+              <select className="form-select form-select-sm" style={{ width: "auto" }} value={activeApt?.apartamento_id || ""}
+                onChange={(e) => { const apt = apartamentos.find(a => String(a.apartamento_id) === e.target.value); if (apt) handleSwitchApt(apt); }}>
+                {apartamentos.map(a => <option key={a.apartamento_id} value={a.apartamento_id}>Bloco {a.numero_bloco} — Apto {a.numero_apartamento}</option>)}
               </select>
             )}
             <button onClick={handleLogout} className="btn btn-outline-danger btn-sm">Sair</button>
@@ -375,28 +363,24 @@ export default function Dashboard() {
       {/* Navegação */}
       <div className="d-flex flex-wrap gap-2 mb-4">
         {[
-          { key: "menu", label: "🏠 Início" },
-          { key: "registrar", label: "📝 Nova Ocorrência" },
-          { key: "visualizar", label: "📋 Histórico" },
-          { key: "meus_apts", label: "🏢 Meus Aptos" },
+          { key: "menu",          label: "🏠 Início" },
+          { key: "registrar",     label: "📝 Nova Ocorrência" },
+          { key: "visualizar",    label: "📋 Histórico" },
+          { key: "meus_apts",     label: "🏢 Meus Aptos" },
           ...(isAdmin ? [
             { key: "solicitacoes", label: `🔔 Solicitações${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ""}` },
-            { key: "gestao", label: "👥 Gestão de Moradores" },
-            { key: "analise", label: "📊 Análise" },
+            { key: "gestao",       label: "👥 Gestão de Moradores" },
+            { key: "analise",      label: "📊 Análise" },
           ] : []),
           { key: "configuracoes", label: "⚙️ Configurações" },
         ].map(({ key, label }) => (
-          <button
-            key={key}
-            className={`btn btn-sm ${view === key ? "btn-primary" : "btn-outline-primary"}`}
-            onClick={() => setView(key)}
-          >
+          <button key={key} className={`btn btn-sm ${view === key ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setView(key)}>
             {label}
           </button>
         ))}
       </div>
 
-      {/* ===================== VIEW: MENU ===================== */}
+      {/* ===== MENU ===== */}
       {view === "menu" && (
         <div className="row">
           <div className="col-md-6 mb-3">
@@ -412,9 +396,7 @@ export default function Dashboard() {
                 <h5 className="text-success">Gestão</h5>
                 <p className="text-muted">Moradores: <strong>{users.length}</strong></p>
                 {pendingRequests.length > 0 && (
-                  <div className="alert alert-warning py-2 small mb-2">
-                    ⚠️ {pendingRequests.length} solicitação(ões) pendente(s) de aprovação.
-                  </div>
+                  <div className="alert alert-warning py-2 small mb-2">⚠️ {pendingRequests.length} solicitação(ões) pendente(s).</div>
                 )}
                 <button className="btn btn-outline-success mt-auto" onClick={() => setView("solicitacoes")}>Ver Solicitações</button>
               </div>
@@ -423,10 +405,16 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ===================== VIEW: REGISTRAR ===================== */}
+      {/* ===== REGISTRAR ===== */}
       {view === "registrar" && (
         <div className="card p-4 shadow-sm">
-          <h5 className="mb-4">Registrar Ocorrência</h5>
+          <h5 className="mb-1">Registrar Ocorrência</h5>
+          {activeApt && (
+            <p className="text-muted small mb-4">
+              Será registrada para: <strong>Bloco {activeApt.numero_bloco} — Apto {activeApt.numero_apartamento}</strong>
+              {apartamentos.length > 1 && <span className="ms-1 text-info">(troque o apto ativo no cabeçalho se necessário)</span>}
+            </p>
+          )}
           <form onSubmit={handleSubmitComplaint}>
             <label className="form-label fw-bold">Assunto</label>
             <select className="form-select mb-3" value={subject} onChange={e => setSubject(e.target.value)} required>
@@ -446,71 +434,45 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ===================== VIEW: HISTÓRICO + EXPORTAÇÃO ===================== */}
+      {/* ===== HISTÓRICO ===== */}
       {view === "visualizar" && (
         <div>
           <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
             <h5 className="mb-0">Histórico de Ocorrências</h5>
             <div className="d-flex gap-2">
-              <button className="btn btn-sm btn-outline-success" onClick={() => exportToExcel(complaints, isAdmin)}>
-                ⬇️ Excel
-              </button>
-              <button className="btn btn-sm btn-outline-danger" onClick={() => exportToPDF(complaints, isAdmin)}>
-                ⬇️ PDF
-              </button>
+              <button className="btn btn-sm btn-outline-success" onClick={() => exportToExcel(complaints.map(c => ({
+                ...(isAdmin ? { Morador: c.morador_nome, Bloco: c.numero_bloco, Apartamento: c.numero_apartamento } : {}),
+                Assunto: c.subject, Descrição: c.description, Status: c.status,
+                Resposta: c.admin_comment || '', Data: new Date(c.created_at).toLocaleDateString('pt-BR')
+              })))}>⬇️ Excel</button>
+              <button className="btn btn-sm btn-outline-danger" onClick={() => exportToPDF(complaints, isAdmin)}>⬇️ PDF</button>
             </div>
           </div>
           <div className="table-responsive card shadow-sm p-3 border-0">
             <table className="table table-hover">
               <thead className="table-light">
-                <tr>
-                  {isAdmin && <th>Morador</th>}
-                  <th>Assunto</th>
-                  <th>Status</th>
-                  <th>Data</th>
-                  <th>Ações</th>
-                </tr>
+                <tr>{isAdmin && <th>Morador</th>}<th>Assunto</th><th>Status</th><th>Data</th><th>Ações</th></tr>
               </thead>
               <tbody>
                 {complaints.length > 0 ? complaints.map(c => (
                   <tr key={c.id}>
-                    {isAdmin && (
-                      <td>
-                        <div className="fw-bold">{c.morador_nome}</div>
-                        <small className="text-muted">B{c.numero_bloco} · Ap{c.numero_apartamento}</small>
-                      </td>
-                    )}
+                    {isAdmin && <td><div className="fw-bold">{c.morador_nome}</div><small className="text-muted">B{c.numero_bloco} · Ap{c.numero_apartamento}</small></td>}
                     <td>{c.subject}</td>
-                    <td>
-                      <span className={`badge ${c.status === "Resolvido" ? "bg-success" : c.status === "Em Análise" ? "bg-info" : "bg-warning text-dark"}`}>
-                        {c.status}
-                      </span>
-                    </td>
+                    <td><span className={`badge ${c.status === "Resolvido" ? "bg-success" : c.status === "Em Análise" ? "bg-info" : "bg-warning text-dark"}`}>{c.status}</span></td>
                     <td><small>{new Date(c.created_at).toLocaleDateString('pt-BR')}</small></td>
-                    <td>
-                      <button className="btn btn-sm btn-info text-white" onClick={() => {
-                        setSelectedComplaint(c);
-                        setNewStatus(c.status);
-                        setAdminComment(c.admin_comment || "");
-                        setShowModal(true);
-                      }}>Detalhes</button>
-                    </td>
+                    <td><button className="btn btn-sm btn-info text-white" onClick={() => { setSelectedComplaint(c); setNewStatus(c.status); setAdminComment(c.admin_comment || ""); setShowModal(true); }}>Detalhes</button></td>
                   </tr>
-                )) : (
-                  <tr><td colSpan="5" className="text-center py-4 text-muted">Nenhuma ocorrência encontrada.</td></tr>
-                )}
+                )) : <tr><td colSpan="5" className="text-center py-4 text-muted">Nenhuma ocorrência encontrada.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ===================== VIEW: MEUS APARTAMENTOS ===================== */}
+      {/* ===== MEUS APARTAMENTOS ===== */}
       {view === "meus_apts" && (
         <div>
           <h5 className="mb-4">Meus Apartamentos</h5>
-
-          {/* Apartamentos já vinculados */}
           <div className="card p-4 shadow-sm mb-4">
             <h6 className="fw-bold mb-3">Vinculados</h6>
             {apartamentos.length > 0 ? (
@@ -518,23 +480,19 @@ export default function Dashboard() {
                 {apartamentos.map(a => (
                   <li key={a.apartamento_id} className="list-group-item d-flex justify-content-between align-items-center">
                     <span>Bloco {a.numero_bloco} — Apto {a.numero_apartamento}</span>
-                    {activeApt?.apartamento_id === a.apartamento_id ? (
-                      <span className="badge bg-primary">Ativo</span>
-                    ) : (
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => handleSwitchApt(a)}>Usar este</button>
-                    )}
+                    {activeApt?.apartamento_id === a.apartamento_id
+                      ? <span className="badge bg-primary">Ativo</span>
+                      : <button className="btn btn-sm btn-outline-primary" onClick={() => handleSwitchApt(a)}>Usar este</button>
+                    }
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p className="text-muted small">Nenhum apartamento vinculado.</p>
-            )}
+            ) : <p className="text-muted small">Nenhum apartamento vinculado.</p>}
           </div>
 
-          {/* Formulário de solicitação */}
           <div className="card p-4 shadow-sm mb-4">
-            <h6 className="fw-bold mb-3">Solicitar vínculo com novo apartamento</h6>
-            <p className="text-muted small">A solicitação será analisada pelo síndico do bloco antes de ser aprovada.</p>
+            <h6 className="fw-bold mb-1">Solicitar vínculo com novo apartamento</h6>
+            <p className="text-muted small mb-3">A solicitação será analisada pelo síndico antes de ser aprovada.</p>
             <form onSubmit={handleSendRequest} className="d-flex gap-2 flex-wrap align-items-end">
               <div>
                 <label className="form-label small mb-1">Bloco</label>
@@ -550,35 +508,21 @@ export default function Dashboard() {
                   {reqAvailableApts.map((a, i) => <option key={i} value={a.numero_apartamento}>Apto {a.numero_apartamento}</option>)}
                 </select>
               </div>
-              <button className="btn btn-primary btn-sm" type="submit" disabled={isSendingReq}>
-                {isSendingReq ? "Enviando..." : "Enviar Solicitação"}
-              </button>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={isSendingReq}>{isSendingReq ? "Enviando..." : "Enviar Solicitação"}</button>
             </form>
-            {reqMsg.text && (
-              <div className={`alert ${reqMsg.type === "error" ? "alert-danger" : "alert-success"} mt-3 py-2 mb-0 small`}>
-                {reqMsg.text}
-              </div>
-            )}
+            {reqMsg.text && <div className={`alert ${reqMsg.type === "error" ? "alert-danger" : "alert-success"} mt-3 py-2 mb-0 small`}>{reqMsg.text}</div>}
           </div>
 
-          {/* Minhas solicitações */}
           {myRequests.length > 0 && (
             <div className="card p-4 shadow-sm">
               <h6 className="fw-bold mb-3">Minhas Solicitações</h6>
               <table className="table table-sm">
-                <thead className="table-light">
-                  <tr><th>Bloco</th><th>Apto</th><th>Status</th><th>Data</th></tr>
-                </thead>
+                <thead className="table-light"><tr><th>Bloco</th><th>Apto</th><th>Status</th><th>Data</th></tr></thead>
                 <tbody>
                   {myRequests.map(r => (
                     <tr key={r.request_id}>
-                      <td>{r.numero_bloco}</td>
-                      <td>{r.numero_apartamento}</td>
-                      <td>
-                        <span className={`badge ${r.status === "Aprovado" ? "bg-success" : r.status === "Negado" ? "bg-danger" : "bg-warning text-dark"}`}>
-                          {r.status}
-                        </span>
-                      </td>
+                      <td>{r.numero_bloco}</td><td>{r.numero_apartamento}</td>
+                      <td><span className={`badge ${r.status === "Aprovado" ? "bg-success" : r.status === "Negado" ? "bg-danger" : "bg-warning text-dark"}`}>{r.status}</span></td>
                       <td><small>{new Date(r.created_at).toLocaleDateString('pt-BR')}</small></td>
                     </tr>
                   ))}
@@ -589,24 +533,19 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ===================== VIEW: SOLICITAÇÕES (SÍNDICO) ===================== */}
+      {/* ===== SOLICITAÇÕES ===== */}
       {view === "solicitacoes" && isAdmin && (
         <div className="card p-4 shadow-sm">
           <h5 className="mb-4">Solicitações de Vínculo Pendentes</h5>
-          {pendingRequests.length === 0 ? (
-            <p className="text-muted">Nenhuma solicitação pendente.</p>
-          ) : (
+          {pendingRequests.length === 0 ? <p className="text-muted">Nenhuma solicitação pendente.</p> : (
             <table className="table table-hover">
-              <thead className="table-light">
-                <tr><th>Morador</th><th>E-mail</th><th>Bloco</th><th>Apto</th><th>Data</th><th>Ações</th></tr>
-              </thead>
+              <thead className="table-light"><tr><th>Morador</th><th>E-mail</th><th>Bloco</th><th>Apto</th><th>Data</th><th>Ações</th></tr></thead>
               <tbody>
                 {pendingRequests.map(r => (
                   <tr key={r.request_id}>
                     <td className="fw-bold">{r.morador_nome}</td>
                     <td><small>{r.morador_email}</small></td>
-                    <td>{r.numero_bloco}</td>
-                    <td>{r.numero_apartamento}</td>
+                    <td>{r.numero_bloco}</td><td>{r.numero_apartamento}</td>
                     <td><small>{new Date(r.created_at).toLocaleDateString('pt-BR')}</small></td>
                     <td>
                       <div className="d-flex gap-1">
@@ -622,60 +561,111 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ===================== VIEW: GESTÃO DE MORADORES ===================== */}
+      {/* ===== GESTÃO DE MORADORES ===== */}
       {view === "gestao" && isAdmin && (
         <div>
-          <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-            <h5 className="mb-0">Gestão de Moradores</h5>
+          <div className="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <div>
+              <h5 className="mb-0">Gestão de Moradores</h5>
+              {isSindico && (
+                <p className="text-muted small mb-0 mt-1">
+                  Você pode alterar o cargo de cada morador. Cada bloco só pode ter <strong>1 Síndico de Bloco</strong>.
+                </p>
+              )}
+            </div>
             <div className="d-flex gap-2">
-              <button className="btn btn-sm btn-outline-success" onClick={() => exportToExcel(users.map(u => ({ Nome: u.nome, Email: u.email, Bloco: u.numero_bloco, Apartamento: u.numero_apartamento, Perfil: u.role })), false)}>
-                ⬇️ Excel
-              </button>
-              <button className="btn btn-sm btn-outline-danger" onClick={() => exportToPDF(users.map(u => ({ subject: u.nome, description: u.email, status: u.role, admin_comment: `B${u.numero_bloco} Ap${u.numero_apartamento}`, created_at: new Date() })), false)}>
-                ⬇️ PDF
-              </button>
+              <button className="btn btn-sm btn-outline-success" onClick={() => exportToExcel(users.map(u => ({ Nome: u.nome, Email: u.email, Bloco: u.numero_bloco, Apartamento: u.numero_apartamento, Cargo: ROLE_LABELS[u.role] || u.role })))}>⬇️ Excel</button>
+              <button className="btn btn-sm btn-outline-danger" onClick={() => exportToPDF(users.map(u => ({ subject: u.nome, description: u.email, status: ROLE_LABELS[u.role] || u.role, admin_comment: `B${u.numero_bloco} Ap${u.numero_apartamento}`, created_at: new Date() })), false)}>⬇️ PDF</button>
             </div>
           </div>
+
+          {/* Legenda de síndicos por bloco (só para o síndico geral) */}
+          {isSindico && Object.keys(adminBlocoMap).length > 0 && (
+            <div className="alert alert-info py-2 small mb-3">
+              <strong>Síndicos de Bloco ativos:</strong>{" "}
+              {Object.entries(adminBlocoMap).map(([blocoId, nome]) => {
+                const bloco = users.find(u => String(u.bloco_id) === String(blocoId));
+                return <span key={blocoId} className="me-3">Bloco {bloco?.numero_bloco || blocoId}: <strong>{nome}</strong></span>;
+              })}
+            </div>
+          )}
+
           <div className="table-responsive card shadow-sm p-3 border-0">
-            <table className="table table-hover">
+            <table className="table table-hover align-middle">
               <thead className="table-light">
-                <tr><th>Nome</th><th>E-mail</th><th>Bloco</th><th>Apto</th><th>Perfil</th><th>Ações</th></tr>
+                <tr><th>Nome</th><th>E-mail</th><th>Bloco</th><th>Apto</th><th>Cargo</th><th>Ações</th></tr>
               </thead>
               <tbody>
-                {users.length > 0 ? users.map(u => (
-                  <tr key={u.morador_id}>
-                    <td className="fw-bold">{u.nome}</td>
-                    <td><small>{u.email}</small></td>
-                    <td>{u.numero_bloco || "—"}</td>
-                    <td>{u.numero_apartamento || "—"}</td>
-                    <td><span className="badge bg-secondary">{u.role}</span></td>
-                    <td>
-                      {u.morador_id !== user.id && (
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => handleDeleteUser(u.morador_id, u.nome)}
-                        >
-                          🗑 Excluir
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan="6" className="text-center py-4 text-muted">Nenhum morador encontrado.</td></tr>
-                )}
+                {users.length > 0 ? users.map(u => {
+                  const isMe = u.morador_id === user.id;
+                  // Verifica se o bloco deste morador já tem admin_bloco (para warning no select)
+                  const blocoJaTemAdmin = u.role !== "admin_bloco" && adminBlocoMap[u.bloco_id];
+
+                  return (
+                    <tr key={u.morador_id}>
+                      <td className="fw-bold">{u.nome}</td>
+                      <td><small>{u.email}</small></td>
+                      <td>{u.numero_bloco || "—"}</td>
+                      <td>{u.numero_apartamento || "—"}</td>
+
+                      {/* Coluna Cargo */}
+                      <td style={{ minWidth: 180 }}>
+                        {isSindico && !isMe ? (
+                          <div>
+                            <select
+                              className="form-select form-select-sm"
+                              value={u.role}
+                              disabled={changingRoleId === u.morador_id}
+                              onChange={(e) => handleChangeRole(u.morador_id, e.target.value, u.bloco_id)}
+                            >
+                              <option value="morador">Morador</option>
+                              <option value="admin_bloco">Sínd. Bloco</option>
+                              <option value="sindico">Síndico Geral</option>
+                            </select>
+                            {/* Aviso preventivo: bloco já tem admin */}
+                            {blocoJaTemAdmin && u.role === "morador" && (
+                              <div className="text-warning small mt-1">
+                                ⚠️ Bloco {u.numero_bloco} já tem síndico: <em>{adminBlocoMap[u.bloco_id]}</em>
+                              </div>
+                            )}
+                            {/* Feedback da operação */}
+                            {roleMsg.id === u.morador_id && roleMsg.text && (
+                              <div className={`small mt-1 ${roleMsg.type === "error" ? "text-danger" : "text-success"}`}>
+                                {roleMsg.text}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={`badge ${ROLE_BADGE[u.role] || "bg-secondary"}`}>
+                            {ROLE_LABELS[u.role] || u.role}{isMe && " (você)"}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Ações */}
+                      <td>
+                        {!isMe && (
+                          <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteUser(u.morador_id, u.nome)}>
+                            🗑 Excluir
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                }) : <tr><td colSpan="6" className="text-center py-4 text-muted">Nenhum morador encontrado.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ===================== VIEW: ANÁLISE ===================== */}
+      {/* ===== ANÁLISE ===== */}
       {view === "analise" && isAdmin && (
         <div>
           <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <h5 className="mb-0">Análise de Dados</h5>
             <div className="d-flex gap-2">
-              <button className="btn btn-sm btn-outline-success" onClick={() => exportToExcel(complaints, isAdmin)}>⬇️ Excel</button>
+              <button className="btn btn-sm btn-outline-success" onClick={() => exportToExcel(complaints.map(c => ({ Morador: c.morador_nome, Bloco: c.numero_bloco, Apto: c.numero_apartamento, Assunto: c.subject, Status: c.status, Data: new Date(c.created_at).toLocaleDateString('pt-BR') })))}>⬇️ Excel</button>
               <button className="btn btn-sm btn-outline-danger" onClick={() => exportToPDF(complaints, isAdmin)}>⬇️ PDF</button>
             </div>
           </div>
@@ -684,10 +674,7 @@ export default function Dashboard() {
             {statusData.map(s => (
               <div key={s.name} className="col-md-4 mb-3">
                 <div className="card shadow-sm border-0 p-3 d-flex flex-row justify-content-between align-items-center">
-                  <div>
-                    <div className="text-muted small">{s.name}</div>
-                    <div className="fw-bold fs-3" style={{ color: STATUS_COLORS[s.name] }}>{s.value}</div>
-                  </div>
+                  <div><div className="text-muted small">{s.name}</div><div className="fw-bold fs-3" style={{ color: STATUS_COLORS[s.name] }}>{s.value}</div></div>
                   <span style={{ fontSize: 28 }}>{s.name === "Pendente" ? "⏳" : s.name === "Em Análise" ? "🔍" : "✅"}</span>
                 </div>
               </div>
@@ -705,9 +692,7 @@ export default function Dashboard() {
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <Tooltip content={<CustomTooltip />} />
-                      <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                        {categoryData.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
-                      </Bar>
+                      <Bar dataKey="value" radius={[6, 6, 0, 0]}>{categoryData.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}</Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -748,7 +733,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ===================== VIEW: CONFIGURAÇÕES ===================== */}
+      {/* ===== CONFIGURAÇÕES ===== */}
       {view === "configuracoes" && (
         <div className="row">
           <div className="col-md-6">
@@ -756,62 +741,29 @@ export default function Dashboard() {
               <h5 className="mb-1">Perfil</h5>
               <p className="text-muted small mb-4">Informações da sua conta</p>
               <div className="mb-2"><strong>Nome:</strong> {user.nome}</div>
-              <div className="mb-2"><strong>Cargo:</strong> {user.role}</div>
-              {activeApt && (
-                <div className="mb-2">
-                  <strong>Apartamento ativo:</strong> Bloco {activeApt.numero_bloco} — Apto {activeApt.numero_apartamento}
-                </div>
-              )}
+              <div className="mb-2"><strong>Cargo:</strong> {ROLE_LABELS[user.role] || user.role}</div>
+              {activeApt && <div className="mb-2"><strong>Apartamento ativo:</strong> Bloco {activeApt.numero_bloco} — Apto {activeApt.numero_apartamento}</div>}
             </div>
           </div>
-
           <div className="col-md-6 mt-4 mt-md-0">
             <div className="card p-4 shadow-sm">
               <h5 className="mb-1">Alterar Senha</h5>
-              <p className="text-muted small mb-4">Preencha os campos abaixo para redefinir sua senha</p>
+              <p className="text-muted small mb-4">Preencha os campos para redefinir sua senha</p>
               <form onSubmit={handleChangePassword}>
                 <div className="mb-3">
                   <label className="form-label fw-bold small">Senha Atual</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={senhaAtual}
-                    onChange={e => setSenhaAtual(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
+                  <input type="password" className="form-control" value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} required autoComplete="current-password" />
                 </div>
                 <div className="mb-3">
                   <label className="form-label fw-bold small">Nova Senha</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    placeholder="Mín. 6 caracteres"
-                    value={novaSenha}
-                    onChange={e => setNovaSenha(e.target.value)}
-                    required
-                    autoComplete="new-password"
-                  />
+                  <input type="password" className="form-control" placeholder="Mín. 6 caracteres" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} required autoComplete="new-password" />
                 </div>
                 <div className="mb-3">
                   <label className="form-label fw-bold small">Confirmar Nova Senha</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    value={confirmarSenha}
-                    onChange={e => setConfirmarSenha(e.target.value)}
-                    required
-                    autoComplete="new-password"
-                  />
+                  <input type="password" className="form-control" value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} required autoComplete="new-password" />
                 </div>
-                {senhaMsg.text && (
-                  <div className={`alert ${senhaMsg.type === "error" ? "alert-danger" : "alert-success"} py-2 small`}>
-                    {senhaMsg.text}
-                  </div>
-                )}
-                <button className="btn btn-primary w-100" type="submit" disabled={isSavingPass}>
-                  {isSavingPass ? "Salvando..." : "Salvar Nova Senha"}
-                </button>
+                {senhaMsg.text && <div className={`alert ${senhaMsg.type === "error" ? "alert-danger" : "alert-success"} py-2 small`}>{senhaMsg.text}</div>}
+                <button className="btn btn-primary w-100" type="submit" disabled={isSavingPass}>{isSavingPass ? "Salvando..." : "Salvar Nova Senha"}</button>
               </form>
             </div>
           </div>
@@ -834,9 +786,7 @@ export default function Dashboard() {
                   <div className="mt-3 bg-light p-3 rounded">
                     <label className="form-label fw-bold">Atualizar Status</label>
                     <select className="form-select mb-3" value={newStatus} onChange={e => setNewStatus(e.target.value)}>
-                      <option>Pendente</option>
-                      <option>Em Análise</option>
-                      <option>Resolvido</option>
+                      <option>Pendente</option><option>Em Análise</option><option>Resolvido</option>
                     </select>
                     <label className="form-label fw-bold">Comentário do Síndico</label>
                     <textarea className="form-control" rows="2" value={adminComment} onChange={e => setAdminComment(e.target.value)} />
